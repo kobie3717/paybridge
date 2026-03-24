@@ -1,0 +1,387 @@
+# PayBridge
+
+> **One API. Every payment provider. 🌍**
+
+[![npm version](https://img.shields.io/npm/v/paybridge.svg)](https://www.npmjs.com/package/paybridge)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue)](https://www.typescriptlang.org/)
+
+Unified payment SDK for Node.js that works with multiple payment providers through a single, consistent API. Focus on South African providers first, with support for international gateways.
+
+**WaSP is to WhatsApp what PayBridge is to payments** — one SDK, multiple backends, zero friction.
+
+## Features
+
+- **Unified API** — Same code works across all providers
+- **TypeScript-first** — Full type safety and autocomplete
+- **South African focus** — SoftyComp, Yoco, Ozow, PayFast ready
+- **International support** — Stripe, PayStack, Peach Payments (coming soon)
+- **Production-ready** — Webhooks, refunds, subscriptions, retries
+- **Zero lock-in** — Switch providers by changing 1 config line
+
+## Installation
+
+```bash
+npm install paybridge
+```
+
+## Quick Start
+
+### One-time Payment
+
+```typescript
+import { PayBridge } from 'paybridge';
+
+// Initialize with your provider
+const pay = new PayBridge({
+  provider: 'softycomp',
+  credentials: {
+    apiKey: process.env.SOFTYCOMP_API_KEY,
+    secretKey: process.env.SOFTYCOMP_SECRET_KEY
+  },
+  sandbox: true
+});
+
+// Create payment — same API regardless of provider
+const payment = await pay.createPayment({
+  amount: 299.00,        // Always in major currency unit (rands)
+  currency: 'ZAR',
+  reference: 'INV-001',
+  customer: {
+    name: 'John Doe',
+    email: 'john@example.com',
+    phone: '0825551234'
+  },
+  urls: {
+    success: 'https://myapp.com/success',
+    cancel: 'https://myapp.com/cancel',
+    webhook: 'https://myapp.com/webhook'
+  }
+});
+
+// Redirect customer to payment page
+console.log(payment.checkoutUrl);
+// Payment details
+console.log(payment.id);       // Provider payment ID
+console.log(payment.status);   // 'pending' | 'completed' | 'failed' | 'cancelled'
+console.log(payment.provider); // 'softycomp'
+```
+
+### Recurring Subscription
+
+```typescript
+const subscription = await pay.createSubscription({
+  amount: 299.00,
+  currency: 'ZAR',
+  interval: 'monthly',     // 'weekly' | 'monthly' | 'yearly'
+  reference: 'SUB-001',
+  customer: {
+    name: 'Jane Smith',
+    email: 'jane@example.com'
+  },
+  urls: {
+    success: 'https://myapp.com/success',
+    cancel: 'https://myapp.com/cancel',
+    webhook: 'https://myapp.com/webhook'
+  },
+  startDate: '2026-04-01',  // Must be future date
+  billingDay: 1             // Day of month (1-28)
+});
+```
+
+### Refund
+
+```typescript
+// Full refund
+const refund = await pay.refund({
+  paymentId: 'pay_123'
+});
+
+// Partial refund
+const refund = await pay.refund({
+  paymentId: 'pay_123',
+  amount: 100.00,
+  reason: 'Customer request'
+});
+```
+
+### Check Payment Status
+
+```typescript
+const payment = await pay.getPayment('pay_123');
+if (payment.status === 'completed') {
+  console.log('Payment received!');
+}
+```
+
+### Webhooks
+
+```typescript
+import express from 'express';
+
+const app = express();
+
+// IMPORTANT: Use express.raw() for signature verification
+app.post('/webhook', express.raw({ type: 'application/json' }), (req, res) => {
+  // Verify webhook signature
+  if (!pay.verifyWebhook(req.body, req.headers)) {
+    return res.status(400).send('Invalid signature');
+  }
+
+  // Parse webhook event
+  const event = pay.parseWebhook(req.body, req.headers);
+
+  switch (event.type) {
+    case 'payment.completed':
+      console.log('Payment completed:', event.payment);
+      // Fulfill order, activate subscription, etc.
+      break;
+
+    case 'payment.failed':
+      console.log('Payment failed:', event.payment);
+      // Notify customer
+      break;
+
+    case 'payment.cancelled':
+      console.log('Payment cancelled:', event.payment);
+      break;
+
+    case 'refund.completed':
+      console.log('Refund completed:', event.refund);
+      break;
+  }
+
+  res.sendStatus(200);
+});
+```
+
+## Supported Providers
+
+| Provider | One-time | Subscriptions | Refunds | Webhooks | Status |
+|----------|----------|---------------|---------|----------|--------|
+| **SoftyComp** | ✅ | ✅ | ✅ | ✅ | **Production** |
+| **Yoco** | 🚧 | 🚧 | 🚧 | 🚧 | Coming soon |
+| **Ozow** | 🚧 | 🚧 | 🚧 | 🚧 | Coming soon |
+| **PayFast** | 📋 | 📋 | 📋 | 📋 | Planned |
+| **PayStack** | 📋 | 📋 | 📋 | 📋 | Planned |
+| **Stripe** | 📋 | 📋 | 📋 | 📋 | Planned |
+| **Peach Payments** | 📋 | 📋 | 📋 | 📋 | Planned |
+
+**Legend:** ✅ Production ready | 🚧 In development | 📋 Planned
+
+## Provider Configuration
+
+### SoftyComp
+
+```typescript
+const pay = new PayBridge({
+  provider: 'softycomp',
+  credentials: {
+    apiKey: 'your_api_key',
+    secretKey: 'your_secret_key'
+  },
+  sandbox: true,
+  webhookSecret: 'optional_webhook_secret'
+});
+```
+
+**Docs:** [SoftyComp API](https://webapps.softycomp.co.za)
+
+### Yoco (Coming Soon)
+
+```typescript
+const pay = new PayBridge({
+  provider: 'yoco',
+  credentials: {
+    apiKey: 'sk_test_...' // Secret key
+  },
+  sandbox: true,
+  webhookSecret: 'whsec_...'
+});
+```
+
+**Docs:** [Yoco Developer](https://developer.yoco.com)
+
+### Ozow (Coming Soon)
+
+```typescript
+const pay = new PayBridge({
+  provider: 'ozow',
+  credentials: {
+    apiKey: 'your_api_key',
+    siteCode: 'your_site_code',
+    privateKey: 'your_private_key'
+  },
+  sandbox: true
+});
+```
+
+**Docs:** [Ozow Hub](https://hub.ozow.com)
+
+## Switch Providers in 1 Line
+
+```typescript
+// Using SoftyComp
+const pay1 = new PayBridge({ provider: 'softycomp', credentials: { ... } });
+
+// Switch to Yoco — SAME API!
+const pay2 = new PayBridge({ provider: 'yoco', credentials: { ... } });
+
+// Switch to Ozow — SAME API!
+const pay3 = new PayBridge({ provider: 'ozow', credentials: { ... } });
+
+// All methods work identically
+const payment = await pay1.createPayment({ ... }); // SoftyComp
+const payment = await pay2.createPayment({ ... }); // Yoco
+const payment = await pay3.createPayment({ ... }); // Ozow
+```
+
+## Why PayBridge?
+
+South Africa's payment landscape is **fragmented**. Different providers for different use cases:
+
+- **SoftyComp** — Debit orders and bill presentment
+- **Yoco** — Card payments for SMEs
+- **Ozow** — Instant EFT
+- **PayFast** — Online payments
+
+Each has its own SDK, quirks, and integration patterns. **PayBridge unifies them all.**
+
+### Before PayBridge
+
+```typescript
+// SoftyComp
+const softycomp = new SoftyComp({ ... });
+const bill = await softycomp.createBill({ amount: 299.00, frequency: 'once-off', ... });
+
+// Yoco
+const yoco = new Yoco({ ... });
+const checkout = await yoco.checkouts.create({ amountInCents: 29900, ... });
+
+// Ozow
+const ozow = new Ozow({ ... });
+const payment = await ozow.initiatePayment({ Amount: '299.00', HashCheck: '...', ... });
+```
+
+**Different APIs, different amount formats, different field names.**
+
+### With PayBridge
+
+```typescript
+// ONE API for all providers
+const payment = await pay.createPayment({
+  amount: 299.00,
+  currency: 'ZAR',
+  reference: 'INV-001',
+  customer: { ... },
+  urls: { ... }
+});
+```
+
+**Same code. Every provider.**
+
+## API Reference
+
+### `PayBridge`
+
+#### Constructor
+
+```typescript
+new PayBridge(config: PayBridgeConfig)
+```
+
+#### Methods
+
+- `createPayment(params: CreatePaymentParams): Promise<PaymentResult>`
+- `createSubscription(params: CreateSubscriptionParams): Promise<SubscriptionResult>`
+- `getPayment(id: string): Promise<PaymentResult>`
+- `refund(params: RefundParams): Promise<RefundResult>`
+- `parseWebhook(body: any, headers?: any): WebhookEvent`
+- `verifyWebhook(body: any, headers?: any): boolean`
+- `getProviderName(): string`
+- `getSupportedCurrencies(): string[]`
+
+### Types
+
+See [src/types.ts](src/types.ts) for full type definitions.
+
+## Currency Handling
+
+PayBridge **always uses major currency units** (rands, dollars) in the API:
+
+```typescript
+// ✅ Correct
+{ amount: 299.00, currency: 'ZAR' }
+
+// ❌ Wrong (don't use cents)
+{ amount: 29900, currency: 'ZAR' }
+```
+
+PayBridge handles provider-specific conversions internally:
+- **SoftyComp** uses rands → no conversion
+- **Yoco** uses cents → converts to cents
+- **Ozow** uses rands → no conversion
+
+## Error Handling
+
+```typescript
+try {
+  const payment = await pay.createPayment({ ... });
+} catch (error) {
+  console.error('Payment failed:', error.message);
+  // Handle error (invalid credentials, network error, etc.)
+}
+```
+
+## Webhook Security
+
+**Always verify webhook signatures in production:**
+
+```typescript
+app.post('/webhook', express.raw({ type: 'application/json' }), (req, res) => {
+  // Verify signature
+  if (!pay.verifyWebhook(req.body, req.headers)) {
+    return res.status(401).send('Unauthorized');
+  }
+
+  // Signature valid — process event
+  const event = pay.parseWebhook(req.body, req.headers);
+  // ...
+});
+```
+
+## Roadmap
+
+- [x] **v0.1** — Core API + SoftyComp provider
+- [ ] **v0.2** — Yoco provider
+- [ ] **v0.3** — Ozow provider
+- [ ] **v0.4** — PayFast provider
+- [ ] **v0.5** — PayStack provider (Nigeria)
+- [ ] **v0.6** — Stripe provider (international)
+- [ ] **v0.7** — Peach Payments provider
+- [ ] **v1.0** — Production-ready with all SA providers
+
+## Contributing
+
+We welcome contributions! To add a new payment provider:
+
+1. Create `src/providers/yourprovider.ts` extending `PaymentProvider`
+2. Implement all abstract methods
+3. Add provider to `src/index.ts` factory
+4. Update README with provider details
+5. Submit PR
+
+See [src/providers/softycomp.ts](src/providers/softycomp.ts) for reference implementation.
+
+## License
+
+MIT © [Kobus van Schoor](https://github.com/kobie3717)
+
+## Related Projects
+
+- [**WaSP**](https://github.com/kobie3717/wasp) — Unified WhatsApp API (Baileys, Cloud API, Twilio)
+- [**softycomp-node**](https://github.com/kobie3717/softycomp-node) — Official SoftyComp SDK
+
+---
+
+**Built with ❤️ in South Africa**

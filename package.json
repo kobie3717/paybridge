@@ -1,0 +1,50 @@
+{
+  "name": "paybridge",
+  "version": "0.1.0",
+  "description": "One API, every payment provider. Unified payment SDK for Node.js — SoftyComp, Yoco, Ozow, and more.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "prepublishOnly": "npm run build",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "payments",
+    "south-africa",
+    "payment-gateway",
+    "yoco",
+    "ozow",
+    "softycomp",
+    "payfast",
+    "nodejs",
+    "typescript",
+    "fintech",
+    "payment-integration",
+    "unified-api",
+    "zar",
+    "payment-sdk"
+  ],
+  "author": "Kobus van Schoor",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kobie3717/paybridge.git"
+  },
+  "bugs": {
+    "url": "https://github.com/kobie3717/paybridge/issues"
+  },
+  "homepage": "https://github.com/kobie3717/paybridge#readme",
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^18.19.130",
+    "typescript": "^5.9.3"
+  }
+}
