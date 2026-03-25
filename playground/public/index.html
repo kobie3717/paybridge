@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PayBridge Playground - Interactive Payment Testing</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- Left Sidebar Navigation -->
+  <aside class="sidebar">
+    <div class="logo">
+      <div class="logo-icon">💳</div>
+      <h1>PayBridge</h1>
+      <p class="tagline">One API. Every payment provider.</p>
+    </div>
+
+    <nav class="nav-tabs">
+      <button class="nav-tab active" data-tab="dashboard">
+        <span class="icon">📊</span>
+        Dashboard
+      </button>
+      <button class="nav-tab" data-tab="create">
+        <span class="icon">➕</span>
+        Create Payment
+      </button>
+      <button class="nav-tab" data-tab="webhooks">
+        <span class="icon">🔔</span>
+        Webhooks
+        <span class="badge" id="webhook-badge" style="display:none;">0</span>
+      </button>
+      <button class="nav-tab" data-tab="code">
+        <span class="icon">💻</span>
+        Code Generator
+      </button>
+      <button class="nav-tab" data-tab="explorer">
+        <span class="icon">🔍</span>
+        API Explorer
+      </button>
+    </nav>
+
+    <div class="test-cards">
+      <h3>Test Cards</h3>
+      <div class="card-item">
+        <div class="card-number">4790 4444 xxxx xxxx</div>
+        <div class="card-desc">Success (3DS + MOTO)</div>
+      </div>
+      <div class="card-item">
+        <div class="card-number">4790 3333 xxxx xxxx</div>
+        <div class="card-desc">3DS ✓, MOTO ✗</div>
+      </div>
+    </div>
+
+    <div class="footer">
+      <p>Powered by <strong>PayBridge</strong></p>
+      <a href="https://github.com/kobie3717/paybridge" target="_blank">GitHub</a>
+    </div>
+  </aside>
+
+  <!-- Main Content Area -->
+  <main class="content">
+    <!-- Dashboard Tab -->
+    <section id="tab-dashboard" class="tab-content active">
+      <h2>Dashboard</h2>
+
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-icon online" id="status-indicator">●</div>
+          <div class="stat-value" id="status-text">Checking...</div>
+          <div class="stat-label">API Status</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">📨</div>
+          <div class="stat-value" id="stat-requests">0</div>
+          <div class="stat-label">Requests</div>
+        </div>
+        <div class="stat-card success">
+          <div class="stat-icon">✓</div>
+          <div class="stat-value" id="stat-success">0</div>
+          <div class="stat-label">Success</div>
+        </div>
+        <div class="stat-card error">
+          <div class="stat-icon">✗</div>
+          <div class="stat-value" id="stat-failed">0</div>
+          <div class="stat-label">Failed</div>
+        </div>
+      </div>
+
+      <div class="provider-section">
+        <h3>Provider Selection</h3>
+        <div class="provider-grid">
+          <div class="provider-card active">
+            <div class="provider-status">✓ Active</div>
+            <h4>SoftyComp</h4>
+            <p>South African bill presentment</p>
+            <div class="provider-currency">ZAR</div>
+          </div>
+          <div class="provider-card disabled">
+            <div class="provider-status">Coming Soon</div>
+            <h4>Yoco</h4>
+            <p>Modern payment gateway</p>
+            <div class="provider-currency">ZAR</div>
+          </div>
+          <div class="provider-card disabled">
+            <div class="provider-status">Coming Soon</div>
+            <h4>Ozow</h4>
+            <p>Instant EFT payments</p>
+            <div class="provider-currency">ZAR</div>
+          </div>
+          <div class="provider-card disabled">
+            <div class="provider-status">Coming Soon</div>
+            <h4>PayFast</h4>
+            <p>South African payments</p>
+            <div class="provider-currency">ZAR</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="quick-start">
+        <h3>Quick Start</h3>
+        <pre><code>npm install paybridge</code></pre>
+        <p>Get started with PayBridge in seconds. One unified API for all payment providers.</p>
+      </div>
+    </section>
+
+    <!-- Create Payment Tab -->
+    <section id="tab-create" class="tab-content">
+      <h2>Create Payment</h2>
+
+      <form id="payment-form" class="payment-form">
+        <div class="form-group">
+          <label for="amount">Amount (ZAR)</label>
+          <input type="number" id="amount" step="0.01" value="299.00" required>
+        </div>
+
+        <div class="form-group">
+          <label for="currency">Currency</label>
+          <select id="currency">
+            <option value="ZAR">ZAR (South African Rand)</option>
+            <option value="USD" disabled>USD (coming soon)</option>
+            <option value="EUR" disabled>EUR (coming soon)</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="payment-type">Payment Type</label>
+          <div class="button-group">
+            <button type="button" class="btn-toggle active" data-type="once-off">Once-off</button>
+            <button type="button" class="btn-toggle" data-type="monthly">Monthly</button>
+            <button type="button" class="btn-toggle" data-type="yearly">Yearly</button>
+          </div>
+          <input type="hidden" id="payment-type" value="once-off">
+        </div>
+
+        <div id="recurring-fields" style="display:none;">
+          <div class="form-group">
+            <label for="start-date">Start Date</label>
+            <input type="date" id="start-date">
+          </div>
+          <div class="form-group">
+            <label for="recurring-day">Billing Day (1-28)</label>
+            <input type="number" id="recurring-day" min="1" max="28" value="1">
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="customer-name">Customer Name</label>
+            <input type="text" id="customer-name" value="John Doe" required>
+          </div>
+          <div class="form-group">
+            <label for="customer-email">Customer Email</label>
+            <input type="email" id="customer-email" value="john@gmail.com" required>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="customer-phone">Customer Phone</label>
+            <input type="tel" id="customer-phone" value="0825551234">
+          </div>
+          <div class="form-group">
+            <label for="reference">Reference</label>
+            <input type="text" id="reference" value="" placeholder="Auto-generated" required>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="description">Description</label>
+          <input type="text" id="description" value="Test Payment">
+        </div>
+
+        <button type="submit" class="btn-primary" id="create-btn">
+          <span class="btn-icon">💳</span>
+          Create Payment
+        </button>
+      </form>
+
+      <div id="payment-result" class="result-panel" style="display:none;">
+        <div class="result-header">
+          <h3>Payment Created</h3>
+          <button class="btn-close" onclick="closeResult()">✕</button>
+        </div>
+        <div id="result-json" class="json-viewer"></div>
+        <div class="result-actions">
+          <button class="btn-secondary" id="open-payment-btn" style="display:none;">
+            Open Payment Page →
+          </button>
+          <button class="btn-secondary" onclick="copyCode()">Copy Code</button>
+        </div>
+      </div>
+
+      <div class="code-snippet" id="code-snippet" style="display:none;">
+        <h3>Code Example</h3>
+        <pre><code id="code-example"></code></pre>
+        <button class="btn-copy" onclick="copySnippet()">Copy</button>
+      </div>
+    </section>
+
+    <!-- Webhooks Tab -->
+    <section id="tab-webhooks" class="tab-content">
+      <h2>Webhooks (Live)</h2>
+
+      <div class="webhook-info">
+        <div class="info-box">
+          <strong>Webhook URL:</strong>
+          <code>http://localhost:4020/webhook</code>
+          <button class="btn-icon-only" onclick="copyWebhookUrl()">📋</button>
+        </div>
+        <p>Webhook events will appear below in real-time as they arrive.</p>
+      </div>
+
+      <div id="webhook-events" class="webhook-events">
+        <div class="empty-state">
+          <div class="empty-icon">📭</div>
+          <p>No webhook events yet</p>
+          <p class="empty-hint">Create a payment and complete it to see webhooks appear here</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Code Generator Tab -->
+    <section id="tab-code" class="tab-content">
+      <h2>Code Generator</h2>
+
+      <div class="form-group">
+        <label for="operation-select">Select Operation</label>
+        <select id="operation-select">
+          <option value="createPayment">Create Payment</option>
+          <option value="createSubscription">Create Subscription</option>
+          <option value="checkStatus">Check Payment Status</option>
+          <option value="refund">Process Refund</option>
+          <option value="parseWebhook">Parse Webhook</option>
+        </select>
+      </div>
+
+      <div class="language-toggle">
+        <button class="lang-btn active" data-lang="typescript">TypeScript</button>
+        <button class="lang-btn" data-lang="javascript">JavaScript</button>
+      </div>
+
+      <div class="code-display">
+        <div class="code-header">
+          <span>PayBridge Implementation</span>
+          <button class="btn-copy-code" onclick="copyGeneratedCode()">Copy</button>
+        </div>
+        <pre><code id="generated-code"></code></pre>
+      </div>
+
+      <div class="code-display comparison">
+        <div class="code-header">
+          <span>Without PayBridge (Raw API)</span>
+        </div>
+        <pre><code id="raw-code"></code></pre>
+      </div>
+    </section>
+
+    <!-- API Explorer Tab -->
+    <section id="tab-explorer" class="tab-content">
+      <h2>API Explorer</h2>
+
+      <div class="endpoint-list">
+        <div class="endpoint-card" onclick="fillPaymentForm()">
+          <div class="endpoint-method post">POST</div>
+          <div class="endpoint-info">
+            <h4>/api/payment</h4>
+            <p>Create a one-time payment</p>
+          </div>
+          <button class="btn-try">Try it →</button>
+        </div>
+
+        <div class="endpoint-card" onclick="fillSubscriptionForm()">
+          <div class="endpoint-method post">POST</div>
+          <div class="endpoint-info">
+            <h4>/api/subscription</h4>
+            <p>Create a recurring subscription</p>
+          </div>
+          <button class="btn-try">Try it →</button>
+        </div>
+
+        <div class="endpoint-card">
+          <div class="endpoint-method get">GET</div>
+          <div class="endpoint-info">
+            <h4>/api/payment/:id</h4>
+            <p>Check payment status</p>
+          </div>
+        </div>
+
+        <div class="endpoint-card">
+          <div class="endpoint-method post">POST</div>
+          <div class="endpoint-info">
+            <h4>/api/refund</h4>
+            <p>Process a full or partial refund</p>
+          </div>
+        </div>
+
+        <div class="endpoint-card">
+          <div class="endpoint-method post">POST</div>
+          <div class="endpoint-info">
+            <h4>/webhook</h4>
+            <p>Receive payment webhook events</p>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>

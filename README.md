@@ -25,6 +25,27 @@ Unified payment SDK for Node.js that works with multiple payment providers throu
 npm install paybridge
 ```
 
+## Interactive Playground
+
+Want to see PayBridge in action before writing code? Try our **Stripe-style interactive playground**:
+
+```bash
+cd playground
+npm install
+npm start
+```
+
+Then open **http://localhost:4020** in your browser.
+
+The playground lets you:
+- Create real payments against SoftyComp sandbox
+- Watch webhooks arrive in real-time
+- Generate code snippets (TypeScript/JavaScript)
+- Compare PayBridge vs raw API complexity
+- Test all payment operations with a beautiful UI
+
+Perfect for demos, learning, and rapid prototyping. See [playground/README.md](playground/README.md) for details.
+
 ## Quick Start
 
 ### One-time Payment
