@@ -310,11 +310,13 @@ export class SoftyCompProvider extends PaymentProvider {
   parseWebhook(body: any, _headers?: any): WebhookEvent {
     const event = typeof body === 'string' ? JSON.parse(body) : body;
 
-    // activityTypeID mapping: 1=Pending, 2=Successful, 3=Failed, 4=Cancelled
+    // Handle both field names: activityTypeID (docs) and WebhookTypeID (observed)
+    // Mapping: 1=Pending, 2=Successful, 3=Failed, 4=Cancelled
+    const typeId = event.activityTypeID || event.WebhookTypeID || 1;
     let eventType: 'payment.pending' | 'payment.completed' | 'payment.failed' | 'payment.cancelled' = 'payment.pending';
     let status: PaymentStatus = 'pending';
 
-    switch (event.activityTypeID) {
+    switch (typeId) {
       case 2:
         eventType = 'payment.completed';
         status = 'completed';
