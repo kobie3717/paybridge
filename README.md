@@ -396,7 +396,7 @@ See [src/providers/softycomp.ts](src/providers/softycomp.ts) for reference imple
 
 ## License
 
-MIT © [Kobus van Schoor](https://github.com/kobie3717)
+MIT © [Kobie Wentzel](https://github.com/kobie3717)
 
 ## Related Projects
 
