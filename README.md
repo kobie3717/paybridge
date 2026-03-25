@@ -5,6 +5,7 @@
 [![npm version](https://img.shields.io/npm/v/paybridge.svg)](https://www.npmjs.com/package/paybridge)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue)](https://www.typescriptlang.org/)
+[![Discord](https://img.shields.io/badge/Discord-Join%20Chat-5865F2?logo=discord&logoColor=white)](https://discord.gg/Y2jCXNGgE)
 
 Unified payment SDK for Node.js that works with multiple payment providers through a single, consistent API. Focus on South African providers first, with support for international gateways.
 
@@ -393,6 +394,12 @@ We welcome contributions! To add a new payment provider:
 5. Submit PR
 
 See [src/providers/softycomp.ts](src/providers/softycomp.ts) for reference implementation.
+
+## Community
+
+Join our Discord for support, feature discussions, and updates:
+
+- **Discord:** [https://discord.gg/Y2jCXNGgE](https://discord.gg/Y2jCXNGgE)
 
 ## License
 
