@@ -176,12 +176,12 @@ export class SoftyCompProvider extends PaymentProvider {
   async createSubscription(params: CreateSubscriptionParams): Promise<SubscriptionResult> {
     this.validateCurrency(params.currency);
 
-    // Map interval to SoftyComp frequency: 2=monthly, 7=yearly
+    // Map interval to SoftyComp frequency: 2=monthly, 6=yearly (valid range is 1-6)
     let frequencyTypeID: number;
     if (params.interval === 'monthly') {
       frequencyTypeID = 2;
     } else if (params.interval === 'yearly') {
-      frequencyTypeID = 7;
+      frequencyTypeID = 6;
     } else {
       throw new Error(`SoftyComp does not support ${params.interval} subscriptions. Use monthly or yearly.`);
     }
