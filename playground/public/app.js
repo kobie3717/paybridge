@@ -8,6 +8,9 @@ let webhookCount = 0;
 document.addEventListener('DOMContentLoaded', () => {
   initTabs();
   initPaymentForm();
+  initBillManagement();
+  initDebitOrders();
+  initClients();
   initCodeGenerator();
   checkAPIStatus();
   loadStats();
@@ -617,6 +620,236 @@ const response = await fetch('https://sandbox.softycomp.co.za/SoftyCompBureauAPI
   // Process event...
   res.sendStatus(200);
 });`
+    },
+    updateBill: {
+      paybridge: `// Update bill presentment details
+await pay.provider.updateBillPresentment({
+  reference: 'BILL-REF-123',
+  amount: 399.00,
+  description: 'Updated description',
+  customerEmail: 'newemail@example.com'
+});`,
+      raw: `// Raw SoftyComp API - complex, requires fetching current bill first
+const token = await authenticate();
+const currentBill = await fetch(baseUrl + '/api/paygatecontroller/listBillPresentmentDetails/BILL-REF-123/BILL-REF-123', {
+  headers: { Authorization: 'Bearer ' + token }
+}).then(r => r.json());
+
+await fetch(baseUrl + '/api/paygatecontroller/updateBillPresentment', {
+  method: 'POST',
+  headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    Reference: 'BILL-REF-123',
+    UserReference: currentBill.userReference,
+    Items: currentBill.items,
+    Emailaddress: 'newemail@example.com'
+  })
+});`
+    },
+    expireBill: {
+      paybridge: `// Set bill to expired status
+await pay.provider.setBillToExpiredStatus('BILL-REF-123', 'USER-REF-123');`,
+      raw: `// Raw SoftyComp API
+const token = await authenticate();
+await fetch(baseUrl + '/api/paygatecontroller/setBillToExpiredStatus/BILL-REF-123/USER-REF-123', {
+  method: 'POST',
+  headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+  body: ''
+});`
+    },
+    billAudits: {
+      paybridge: `// List bill audit trail
+const audits = await pay.provider.listBillPresentmentAudits('BILL-REF-123', 'USER-REF-123');
+
+audits.forEach(audit => {
+  console.log(\`\${audit.timestamp}: \${audit.description} by \${audit.user}\`);
+});`,
+      raw: `// Raw SoftyComp API
+const token = await authenticate();
+const response = await fetch(baseUrl + '/api/paygatecontroller/listBillPresentmentAudits/BILL-REF-123/USER-REF-123', {
+  headers: { Authorization: 'Bearer ' + token }
+});
+const audits = await response.json();`
+    },
+    reauthBill: {
+      paybridge: `// Re-authentication bill (card expiry)
+const newBill = await pay.provider.createReauthBill({
+  oldReference: 'OLD-BILL-123',
+  newReference: 'NEW-BILL-456',
+  amount: 99.00,
+  customerName: 'John Doe',
+  customerEmail: 'john@example.com',
+  customerPhone: '0825551234',
+  description: 'Monthly subscription',
+  billingCycle: 'MONTHLY',
+  successUrl: 'https://myapp.com/success',
+  cancelUrl: 'https://myapp.com/cancel',
+  notifyUrl: 'https://myapp.com/webhook'
+});
+
+// Redirect customer to new payment page
+res.redirect(newBill.checkoutUrl);`,
+      raw: `// Raw SoftyComp API - requires multiple steps
+// 1. Expire old bill
+const token = await authenticate();
+await fetch(baseUrl + '/api/paygatecontroller/setBillToExpiredStatus/OLD-BILL-123/OLD-BILL-123', {
+  method: 'POST',
+  headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+  body: ''
+});
+
+// 2. Create new bill with recurring settings
+const tomorrow = new Date();
+tomorrow.setDate(tomorrow.getDate() + 1);
+
+const billResponse = await fetch(baseUrl + '/api/paygatecontroller/requestbillpresentment', {
+  method: 'POST',
+  headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    Name: 'John Doe',
+    ModeTypeID: 4,
+    Emailaddress: 'john@example.com',
+    Cellno: '0825551234',
+    UserReference: 'NEW-BILL-456',
+    Items: [{
+      Description: 'Monthly subscription',
+      Amount: 99.00,
+      FrequencyTypeID: 2, // Monthly
+      CommencementDate: tomorrow.toISOString().split('T')[0],
+      RecurringDay: tomorrow.getDate(),
+      DisplayCompanyName: 'Your Company'
+    }],
+    SuccessURL: 'https://myapp.com/success',
+    CancelURL: 'https://myapp.com/cancel',
+    NotifyURL: 'https://myapp.com/webhook'
+  })
+});`
+    },
+    mobiMandate: {
+      paybridge: `// Create Mobi-Mandate (debit order)
+const mandate = await pay.provider.createMobiMandate({
+  customerEmail: 'john@example.com',
+  customerPhone: '0825551234',
+  surname: 'Doe',
+  initials: 'J',
+  amount: 99.00,
+  frequency: 'monthly',
+  debitDay: 1,
+  description: 'Monthly subscription',
+  successUrl: 'https://myapp.com/success'
+});
+
+// Redirect customer to sign mandate
+res.redirect(mandate.url);`,
+      raw: `// Raw SoftyComp API - extremely complex payload
+const token = await authenticate();
+const tomorrow = new Date();
+tomorrow.setDate(tomorrow.getDate() + 1);
+
+const response = await fetch(baseUrl + '/api/mobimandate/generateMobiMandateRequest', {
+  method: 'POST',
+  headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    EmailAddress: 'john@example.com',
+    CellphoneNumber: '0825551234',
+    ContractCode: 'M' + Date.now().toString().slice(-5),
+    Surname: 'Doe',
+    Initials: 'J',
+    Amount: 99.00,
+    InitialAmount: 99.00,
+    AccountType: 1,
+    CommencementDate: tomorrow.toISOString().split('T')[0],
+    CollectionFrequencyTypeID: 2,
+    CollectionMethodTypeID: 4,
+    DebitDay: 1,
+    Description: 'Monthly subscription',
+    NaedoTrackingCodeID: 12,
+    EntryClassCodeTypeID: 1,
+    AdjustmentCategoryTypeID: 2,
+    DebiCheckMaximumCollectionAmount: 148.50,
+    // ... plus 15+ more required fields
+  })
+});`
+    },
+    collectionStatus: {
+      paybridge: `// Update collection status (e.g., cancel debit order)
+await pay.provider.updateCollectionStatus({
+  collectionId: 12345,
+  statusTypeId: 6  // 6 = Cancelled
+});`,
+      raw: `// Raw SoftyComp API
+const token = await authenticate();
+await fetch(baseUrl + '/api/collections/updateCollectionStatus', {
+  method: 'POST',
+  headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    collectionID: 12345,
+    collectionStatusTypeID: 6
+  })
+});`
+    },
+    createClient: {
+      paybridge: `// Create a new client
+const clientId = await pay.provider.createClient({
+  name: 'John',
+  surname: 'Doe',
+  email: 'john@example.com',
+  phone: '0825551234',
+  idNumber: '8001015009087'
+});
+
+console.log('Client created with ID:', clientId);`,
+      raw: `// Raw SoftyComp API
+const token = await authenticate();
+const response = await fetch(baseUrl + '/api/clients/createclient', {
+  method: 'POST',
+  headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    clientId: 0,
+    clientTypeId: 1,
+    contractCode: 'C' + Date.now().toString().slice(-13),
+    initials: 'J',
+    surname: 'Doe',
+    idnumber: '8001015009087',
+    clientStatusTypeId: 1,
+    cellphoneNumber: '0825551234',
+    emailAddress: 'john@example.com',
+    sendSmsDonotifications: true,
+    sendSmsUnpaidsNotifications: true,
+    isSouthAfricanCitizen: true,
+    fullNames: 'John'
+  })
+});
+const result = await response.json();
+const clientId = result.value;`
+    },
+    payout: {
+      paybridge: `// Create a payout (credit distribution)
+const payout = await pay.provider.createCreditDistribution({
+  amount: 500.00,
+  accountNumber: '1234567890',
+  branchCode: '123456',
+  accountName: 'John Doe',
+  reference: 'PAYOUT-001'
+});
+
+console.log('Payout created:', payout.distributionId);`,
+      raw: `// Raw SoftyComp API
+const token = await authenticate();
+const response = await fetch(baseUrl + '/api/creditdistribution/createCreditDistribution', {
+  method: 'POST',
+  headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    creditFileTransactions: [{
+      amount: 500.00,
+      accountNumber: '1234567890',
+      branchCode: '123456',
+      accountName: 'John Doe',
+      reference: 'PAYOUT-001'
+    }]
+  })
+});
+const result = await response.json();`
     }
   };
 
@@ -721,6 +954,279 @@ function copyCode() {
   const text = jsonViewer.textContent;
   navigator.clipboard.writeText(text);
   alert('Response copied to clipboard!');
+}
+
+// ==================== Bill Management ====================
+function initBillManagement() {
+  // Update Bill Form
+  document.getElementById('update-bill-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const resultDiv = document.getElementById('update-bill-result');
+
+    try {
+      const response = await fetch('/api/update-bill', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          reference: document.getElementById('update-bill-ref').value,
+          customerName: document.getElementById('update-bill-name').value,
+          amount: document.getElementById('update-bill-amount').value || undefined,
+          description: document.getElementById('update-bill-desc').value || undefined,
+          customerEmail: document.getElementById('update-bill-email').value || undefined,
+        }),
+      });
+
+      const data = await response.json();
+      resultDiv.style.display = 'block';
+      resultDiv.className = data.success ? 'result-message success' : 'result-message error';
+      resultDiv.textContent = data.success ? '✓ Bill updated successfully' : `✗ Error: ${data.error}`;
+      loadStats();
+    } catch (error) {
+      resultDiv.style.display = 'block';
+      resultDiv.className = 'result-message error';
+      resultDiv.textContent = `✗ Request failed: ${error.message}`;
+    }
+  });
+
+  // Expire Bill Form
+  document.getElementById('expire-bill-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const resultDiv = document.getElementById('expire-bill-result');
+
+    try {
+      const response = await fetch('/api/expire-bill', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          reference: document.getElementById('expire-bill-ref').value,
+          userReference: document.getElementById('expire-user-ref').value,
+        }),
+      });
+
+      const data = await response.json();
+      resultDiv.style.display = 'block';
+      resultDiv.className = data.success ? 'result-message success' : 'result-message error';
+      resultDiv.textContent = data.success ? '✓ Bill expired successfully' : `✗ Error: ${data.error}`;
+      loadStats();
+    } catch (error) {
+      resultDiv.style.display = 'block';
+      resultDiv.className = 'result-message error';
+      resultDiv.textContent = `✗ Request failed: ${error.message}`;
+    }
+  });
+
+  // Audit Trail Form
+  document.getElementById('audit-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const resultDiv = document.getElementById('audit-result');
+
+    try {
+      const reference = document.getElementById('audit-bill-ref').value;
+      const userReference = document.getElementById('audit-user-ref').value || reference;
+      const response = await fetch(`/api/bill-audits/${reference}?userReference=${userReference}`);
+
+      const data = await response.json();
+      resultDiv.style.display = 'block';
+
+      if (data.success) {
+        resultDiv.className = 'result-message success';
+        resultDiv.innerHTML = `<strong>✓ Audit Trail (${data.audits.length} entries)</strong><pre>${JSON.stringify(data.audits, null, 2)}</pre>`;
+      } else {
+        resultDiv.className = 'result-message error';
+        resultDiv.textContent = `✗ Error: ${data.error}`;
+      }
+      loadStats();
+    } catch (error) {
+      resultDiv.style.display = 'block';
+      resultDiv.className = 'result-message error';
+      resultDiv.textContent = `✗ Request failed: ${error.message}`;
+    }
+  });
+
+  // Re-auth Bill Form
+  document.getElementById('reauth-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const resultDiv = document.getElementById('reauth-result');
+
+    try {
+      const response = await fetch('/api/reauth-bill', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          oldReference: document.getElementById('reauth-old-ref').value,
+          newReference: document.getElementById('reauth-new-ref').value,
+          amount: document.getElementById('reauth-amount').value,
+          billingCycle: document.getElementById('reauth-cycle').value,
+          customerName: document.getElementById('reauth-name').value,
+          customerEmail: document.getElementById('reauth-email').value,
+          customerPhone: document.getElementById('reauth-phone').value,
+          description: 'Re-authentication bill',
+        }),
+      });
+
+      const data = await response.json();
+      resultDiv.style.display = 'block';
+
+      if (data.success) {
+        resultDiv.className = 'result-message success';
+        resultDiv.innerHTML = `<strong>✓ Re-auth bill created</strong><br>Payment URL: <a href="${data.bill.checkoutUrl}" target="_blank">${data.bill.checkoutUrl}</a><pre>${JSON.stringify(data.bill, null, 2)}</pre>`;
+      } else {
+        resultDiv.className = 'result-message error';
+        resultDiv.textContent = `✗ Error: ${data.error}`;
+      }
+      loadStats();
+    } catch (error) {
+      resultDiv.style.display = 'block';
+      resultDiv.className = 'result-message error';
+      resultDiv.textContent = `✗ Request failed: ${error.message}`;
+    }
+  });
+}
+
+// ==================== Debit Orders ====================
+function initDebitOrders() {
+  // Mobi-Mandate Form
+  document.getElementById('mobi-mandate-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const resultDiv = document.getElementById('mobi-mandate-result');
+
+    try {
+      const response = await fetch('/api/mobi-mandate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          surname: document.getElementById('mandate-surname').value,
+          initials: document.getElementById('mandate-initials').value || undefined,
+          customerEmail: document.getElementById('mandate-email').value,
+          customerPhone: document.getElementById('mandate-phone').value,
+          amount: document.getElementById('mandate-amount').value,
+          frequency: document.getElementById('mandate-frequency').value,
+          debitDay: document.getElementById('mandate-debit-day').value,
+          idNumber: document.getElementById('mandate-id-number').value || undefined,
+          description: document.getElementById('mandate-description').value,
+        }),
+      });
+
+      const data = await response.json();
+      resultDiv.style.display = 'block';
+
+      if (data.success) {
+        resultDiv.className = 'result-message success';
+        resultDiv.innerHTML = `<strong>✓ Mobi-Mandate created</strong><br>Mandate URL: <a href="${data.mandate.url}" target="_blank">${data.mandate.url}</a><pre>${JSON.stringify(data.mandate, null, 2)}</pre>`;
+      } else {
+        resultDiv.className = 'result-message error';
+        resultDiv.textContent = `✗ Error: ${data.error}`;
+      }
+      loadStats();
+    } catch (error) {
+      resultDiv.style.display = 'block';
+      resultDiv.className = 'result-message error';
+      resultDiv.textContent = `✗ Request failed: ${error.message}`;
+    }
+  });
+
+  // Collection Status Form
+  document.getElementById('collection-status-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const resultDiv = document.getElementById('collection-status-result');
+
+    try {
+      const response = await fetch('/api/collection-status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          collectionId: document.getElementById('collection-id').value,
+          statusTypeId: document.getElementById('status-type-id').value,
+        }),
+      });
+
+      const data = await response.json();
+      resultDiv.style.display = 'block';
+      resultDiv.className = data.success ? 'result-message success' : 'result-message error';
+      resultDiv.textContent = data.success ? '✓ Collection status updated' : `✗ Error: ${data.error}`;
+      loadStats();
+    } catch (error) {
+      resultDiv.style.display = 'block';
+      resultDiv.className = 'result-message error';
+      resultDiv.textContent = `✗ Request failed: ${error.message}`;
+    }
+  });
+}
+
+// ==================== Clients & Payouts ====================
+function initClients() {
+  // Create Client Form
+  document.getElementById('create-client-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const resultDiv = document.getElementById('create-client-result');
+
+    try {
+      const response = await fetch('/api/client', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: document.getElementById('client-name').value,
+          surname: document.getElementById('client-surname').value,
+          email: document.getElementById('client-email').value,
+          phone: document.getElementById('client-phone').value,
+          idNumber: document.getElementById('client-id-number').value || undefined,
+        }),
+      });
+
+      const data = await response.json();
+      resultDiv.style.display = 'block';
+
+      if (data.success) {
+        resultDiv.className = 'result-message success';
+        resultDiv.innerHTML = `<strong>✓ Client created</strong><br>Client ID: ${data.clientId}`;
+      } else {
+        resultDiv.className = 'result-message error';
+        resultDiv.textContent = `✗ Error: ${data.error}`;
+      }
+      loadStats();
+    } catch (error) {
+      resultDiv.style.display = 'block';
+      resultDiv.className = 'result-message error';
+      resultDiv.textContent = `✗ Request failed: ${error.message}`;
+    }
+  });
+
+  // Payout Form
+  document.getElementById('payout-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const resultDiv = document.getElementById('payout-result');
+
+    try {
+      const response = await fetch('/api/payout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          amount: document.getElementById('payout-amount').value,
+          reference: document.getElementById('payout-reference').value,
+          userReference: document.getElementById('payout-user-reference').value,
+          accountName: document.getElementById('payout-account-name').value,
+          accountNumber: document.getElementById('payout-account-number').value,
+          branchCode: document.getElementById('payout-branch-code').value,
+        }),
+      });
+
+      const data = await response.json();
+      resultDiv.style.display = 'block';
+
+      if (data.success) {
+        resultDiv.className = 'result-message success';
+        resultDiv.innerHTML = `<strong>✓ Payout created</strong><pre>${JSON.stringify(data.payout, null, 2)}</pre>`;
+      } else {
+        resultDiv.className = 'result-message error';
+        resultDiv.textContent = `✗ Error: ${data.error}`;
+      }
+      loadStats();
+    } catch (error) {
+      resultDiv.style.display = 'block';
+      resultDiv.className = 'result-message error';
+      resultDiv.textContent = `✗ Request failed: ${error.message}`;
+    }
+  });
 }
 
 // ==================== Syntax Highlighting ====================

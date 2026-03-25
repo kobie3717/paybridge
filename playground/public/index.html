@@ -24,6 +24,18 @@
         <span class="icon">➕</span>
         Create Payment
       </button>
+      <button class="nav-tab" data-tab="bills">
+        <span class="icon">📄</span>
+        Bill Management
+      </button>
+      <button class="nav-tab" data-tab="debit-orders">
+        <span class="icon">🔁</span>
+        Debit Orders
+      </button>
+      <button class="nav-tab" data-tab="clients">
+        <span class="icon">👤</span>
+        Clients & Payouts
+      </button>
       <button class="nav-tab" data-tab="webhooks">
         <span class="icon">🔔</span>
         Webhooks
@@ -146,6 +158,7 @@
           <label for="payment-type">Payment Type</label>
           <div class="button-group">
             <button type="button" class="btn-toggle active" data-type="once-off">Once-off</button>
+            <button type="button" class="btn-toggle" data-type="weekly">Weekly</button>
             <button type="button" class="btn-toggle" data-type="monthly">Monthly</button>
             <button type="button" class="btn-toggle" data-type="yearly">Yearly</button>
           </div>
@@ -217,6 +230,293 @@
       </div>
     </section>
 
+    <!-- Bill Management Tab -->
+    <section id="tab-bills" class="tab-content">
+      <h2>Bill Management</h2>
+
+      <!-- Update Bill -->
+      <div class="feature-section">
+        <h3>Update Bill Presentment</h3>
+        <form id="update-bill-form" class="payment-form">
+          <div class="form-row">
+            <div class="form-group">
+              <label for="update-bill-ref">Bill Reference</label>
+              <input type="text" id="update-bill-ref" placeholder="BILL-REF-123" required>
+            </div>
+            <div class="form-group">
+              <label for="update-bill-name">Customer Name</label>
+              <input type="text" id="update-bill-name" placeholder="John Doe" required>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="update-bill-amount">New Amount (optional)</label>
+              <input type="number" id="update-bill-amount" step="0.01" placeholder="299.00">
+            </div>
+            <div class="form-group">
+              <label for="update-bill-email">New Email (optional)</label>
+              <input type="email" id="update-bill-email" placeholder="newemail@example.com">
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="update-bill-desc">New Description (optional)</label>
+            <input type="text" id="update-bill-desc" placeholder="Updated description">
+          </div>
+          <button type="submit" class="btn-primary">Update Bill</button>
+        </form>
+        <div id="update-bill-result" class="result-message" style="display:none;"></div>
+      </div>
+
+      <!-- Expire Bill -->
+      <div class="feature-section">
+        <h3>Expire Bill</h3>
+        <form id="expire-bill-form" class="payment-form">
+          <div class="form-row">
+            <div class="form-group">
+              <label for="expire-bill-ref">Bill Reference</label>
+              <input type="text" id="expire-bill-ref" placeholder="BILL-REF-123" required>
+            </div>
+            <div class="form-group">
+              <label for="expire-user-ref">User Reference</label>
+              <input type="text" id="expire-user-ref" placeholder="USER-REF-123" required>
+            </div>
+          </div>
+          <button type="submit" class="btn-primary">Expire Bill</button>
+        </form>
+        <div id="expire-bill-result" class="result-message" style="display:none;"></div>
+      </div>
+
+      <!-- Audit Trail -->
+      <div class="feature-section">
+        <h3>Bill Audit Trail</h3>
+        <form id="audit-form" class="payment-form">
+          <div class="form-row">
+            <div class="form-group">
+              <label for="audit-bill-ref">Bill Reference</label>
+              <input type="text" id="audit-bill-ref" placeholder="BILL-REF-123" required>
+            </div>
+            <div class="form-group">
+              <label for="audit-user-ref">User Reference (optional)</label>
+              <input type="text" id="audit-user-ref" placeholder="USER-REF-123">
+            </div>
+          </div>
+          <button type="submit" class="btn-primary">View Audit Trail</button>
+        </form>
+        <div id="audit-result" class="result-message" style="display:none;"></div>
+      </div>
+
+      <!-- Re-auth Bill -->
+      <div class="feature-section">
+        <h3>Re-authentication Bill (Card Expiry)</h3>
+        <form id="reauth-form" class="payment-form">
+          <div class="form-row">
+            <div class="form-group">
+              <label for="reauth-old-ref">Old Bill Reference</label>
+              <input type="text" id="reauth-old-ref" placeholder="OLD-BILL-123" required>
+            </div>
+            <div class="form-group">
+              <label for="reauth-new-ref">New Bill Reference</label>
+              <input type="text" id="reauth-new-ref" placeholder="NEW-BILL-456" required>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="reauth-amount">Amount (ZAR)</label>
+              <input type="number" id="reauth-amount" step="0.01" value="99.00" required>
+            </div>
+            <div class="form-group">
+              <label for="reauth-cycle">Billing Cycle</label>
+              <select id="reauth-cycle">
+                <option value="MONTHLY">Monthly</option>
+                <option value="YEARLY">Yearly</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="reauth-name">Customer Name</label>
+              <input type="text" id="reauth-name" value="John Doe" required>
+            </div>
+            <div class="form-group">
+              <label for="reauth-email">Customer Email</label>
+              <input type="email" id="reauth-email" value="john@gmail.com" required>
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="reauth-phone">Customer Phone</label>
+            <input type="tel" id="reauth-phone" value="0825551234" required>
+          </div>
+          <button type="submit" class="btn-primary">Create Re-auth Bill</button>
+        </form>
+        <div id="reauth-result" class="result-message" style="display:none;"></div>
+      </div>
+    </section>
+
+    <!-- Debit Orders Tab -->
+    <section id="tab-debit-orders" class="tab-content">
+      <h2>Debit Orders (Mobi-Mandate)</h2>
+
+      <!-- Create Mobi-Mandate -->
+      <div class="feature-section">
+        <h3>Create Mobi-Mandate</h3>
+        <p class="feature-desc">Generate a debit order sign-up link for customers to authorize recurring payments from their bank account.</p>
+        <form id="mobi-mandate-form" class="payment-form">
+          <div class="form-row">
+            <div class="form-group">
+              <label for="mandate-surname">Surname</label>
+              <input type="text" id="mandate-surname" value="Doe" required>
+            </div>
+            <div class="form-group">
+              <label for="mandate-initials">Initials (optional)</label>
+              <input type="text" id="mandate-initials" value="J">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="mandate-email">Email</label>
+              <input type="email" id="mandate-email" value="john@gmail.com" required>
+            </div>
+            <div class="form-group">
+              <label for="mandate-phone">Phone</label>
+              <input type="tel" id="mandate-phone" value="0825551234" required>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="mandate-amount">Amount (ZAR)</label>
+              <input type="number" id="mandate-amount" step="0.01" value="99.00" required>
+            </div>
+            <div class="form-group">
+              <label for="mandate-frequency">Frequency</label>
+              <select id="mandate-frequency">
+                <option value="monthly">Monthly</option>
+                <option value="yearly">Yearly</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="mandate-debit-day">Debit Day (1-28)</label>
+              <input type="number" id="mandate-debit-day" min="1" max="28" value="1">
+            </div>
+            <div class="form-group">
+              <label for="mandate-id-number">ID Number (optional)</label>
+              <input type="text" id="mandate-id-number" placeholder="8001015009087">
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="mandate-description">Description</label>
+            <input type="text" id="mandate-description" value="Monthly Subscription">
+          </div>
+          <button type="submit" class="btn-primary">Generate Mandate Link</button>
+        </form>
+        <div id="mobi-mandate-result" class="result-message" style="display:none;"></div>
+      </div>
+
+      <!-- Update Collection Status -->
+      <div class="feature-section">
+        <h3>Update Collection Status</h3>
+        <p class="feature-desc">Cancel or modify the status of an existing debit order collection.</p>
+        <form id="collection-status-form" class="payment-form">
+          <div class="form-row">
+            <div class="form-group">
+              <label for="collection-id">Collection ID</label>
+              <input type="number" id="collection-id" placeholder="12345" required>
+            </div>
+            <div class="form-group">
+              <label for="status-type-id">Status Type ID</label>
+              <select id="status-type-id">
+                <option value="6">6 - Cancelled</option>
+                <option value="1">1 - Active</option>
+                <option value="2">2 - Suspended</option>
+              </select>
+            </div>
+          </div>
+          <button type="submit" class="btn-primary">Update Status</button>
+        </form>
+        <div id="collection-status-result" class="result-message" style="display:none;"></div>
+      </div>
+    </section>
+
+    <!-- Clients & Payouts Tab -->
+    <section id="tab-clients" class="tab-content">
+      <h2>Client Management & Payouts</h2>
+
+      <!-- Create Client -->
+      <div class="feature-section">
+        <h3>Create Client</h3>
+        <p class="feature-desc">Register a new client in the SoftyComp system.</p>
+        <form id="create-client-form" class="payment-form">
+          <div class="form-row">
+            <div class="form-group">
+              <label for="client-name">First Name</label>
+              <input type="text" id="client-name" value="John" required>
+            </div>
+            <div class="form-group">
+              <label for="client-surname">Surname</label>
+              <input type="text" id="client-surname" value="Doe" required>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="client-email">Email</label>
+              <input type="email" id="client-email" value="john@gmail.com" required>
+            </div>
+            <div class="form-group">
+              <label for="client-phone">Phone</label>
+              <input type="tel" id="client-phone" value="0825551234" required>
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="client-id-number">ID Number (optional)</label>
+            <input type="text" id="client-id-number" placeholder="8001015009087">
+          </div>
+          <button type="submit" class="btn-primary">Create Client</button>
+        </form>
+        <div id="create-client-result" class="result-message" style="display:none;"></div>
+      </div>
+
+      <!-- Create Payout -->
+      <div class="feature-section">
+        <h3>Credit Distribution (Payout)</h3>
+        <p class="feature-desc">Send a payout to a bank account.</p>
+        <form id="payout-form" class="payment-form">
+          <div class="form-row">
+            <div class="form-group">
+              <label for="payout-amount">Amount (ZAR)</label>
+              <input type="number" id="payout-amount" step="0.01" value="500.00" required>
+            </div>
+            <div class="form-group">
+              <label for="payout-reference">Reference</label>
+              <input type="text" id="payout-reference" value="PAYOUT-001" required>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="payout-user-reference">User Reference</label>
+              <input type="text" id="payout-user-reference" placeholder="USER-REF-001" required>
+            </div>
+            <div class="form-group">
+              <label for="payout-account-name">Account Name</label>
+              <input type="text" id="payout-account-name" value="John Doe" required>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="payout-account-number">Account Number</label>
+              <input type="text" id="payout-account-number" placeholder="1234567890" required>
+            </div>
+            <div class="form-group">
+              <label for="payout-branch-code">Branch Code</label>
+              <input type="text" id="payout-branch-code" placeholder="123456" required>
+            </div>
+          </div>
+          <button type="submit" class="btn-primary">Create Payout</button>
+        </form>
+        <div id="payout-result" class="result-message" style="display:none;"></div>
+      </div>
+    </section>
+
     <!-- Webhooks Tab -->
     <section id="tab-webhooks" class="tab-content">
       <h2>Webhooks (Live)</h2>
@@ -246,11 +546,29 @@
       <div class="form-group">
         <label for="operation-select">Select Operation</label>
         <select id="operation-select">
-          <option value="createPayment">Create Payment</option>
-          <option value="createSubscription">Create Subscription</option>
-          <option value="checkStatus">Check Payment Status</option>
-          <option value="refund">Process Refund</option>
-          <option value="parseWebhook">Parse Webhook</option>
+          <optgroup label="Payments & Subscriptions">
+            <option value="createPayment">Create Payment</option>
+            <option value="createSubscription">Create Subscription</option>
+            <option value="checkStatus">Check Payment Status</option>
+            <option value="refund">Process Refund</option>
+          </optgroup>
+          <optgroup label="Bill Management">
+            <option value="updateBill">Update Bill Presentment</option>
+            <option value="expireBill">Expire Bill</option>
+            <option value="billAudits">Bill Audit Trail</option>
+            <option value="reauthBill">Re-authentication Bill</option>
+          </optgroup>
+          <optgroup label="Debit Orders">
+            <option value="mobiMandate">Create Mobi-Mandate</option>
+            <option value="collectionStatus">Update Collection Status</option>
+          </optgroup>
+          <optgroup label="Clients & Payouts">
+            <option value="createClient">Create Client</option>
+            <option value="payout">Create Payout</option>
+          </optgroup>
+          <optgroup label="Webhooks">
+            <option value="parseWebhook">Parse Webhook</option>
+          </optgroup>
         </select>
       </div>
 
@@ -280,6 +598,7 @@
       <h2>API Explorer</h2>
 
       <div class="endpoint-list">
+        <h3 style="margin-bottom: 16px; color: #94a3b8; font-size: 14px; text-transform: uppercase; letter-spacing: 0.05em;">Payments & Subscriptions</h3>
         <div class="endpoint-card" onclick="fillPaymentForm()">
           <div class="endpoint-method post">POST</div>
           <div class="endpoint-info">
@@ -314,6 +633,74 @@
           </div>
         </div>
 
+        <h3 style="margin: 24px 0 16px; color: #94a3b8; font-size: 14px; text-transform: uppercase; letter-spacing: 0.05em;">Bill Management</h3>
+        <div class="endpoint-card">
+          <div class="endpoint-method post">POST</div>
+          <div class="endpoint-info">
+            <h4>/api/update-bill</h4>
+            <p>Update bill presentment details</p>
+          </div>
+        </div>
+
+        <div class="endpoint-card">
+          <div class="endpoint-method post">POST</div>
+          <div class="endpoint-info">
+            <h4>/api/expire-bill</h4>
+            <p>Set bill to expired status</p>
+          </div>
+        </div>
+
+        <div class="endpoint-card">
+          <div class="endpoint-method get">GET</div>
+          <div class="endpoint-info">
+            <h4>/api/bill-audits/:reference</h4>
+            <p>List bill presentment audit trail</p>
+          </div>
+        </div>
+
+        <div class="endpoint-card">
+          <div class="endpoint-method post">POST</div>
+          <div class="endpoint-info">
+            <h4>/api/reauth-bill</h4>
+            <p>Create re-authentication bill (card expiry)</p>
+          </div>
+        </div>
+
+        <h3 style="margin: 24px 0 16px; color: #94a3b8; font-size: 14px; text-transform: uppercase; letter-spacing: 0.05em;">Debit Orders</h3>
+        <div class="endpoint-card">
+          <div class="endpoint-method post">POST</div>
+          <div class="endpoint-info">
+            <h4>/api/mobi-mandate</h4>
+            <p>Create Mobi-Mandate (debit order sign-up)</p>
+          </div>
+        </div>
+
+        <div class="endpoint-card">
+          <div class="endpoint-method post">POST</div>
+          <div class="endpoint-info">
+            <h4>/api/collection-status</h4>
+            <p>Update collection status (cancel, suspend)</p>
+          </div>
+        </div>
+
+        <h3 style="margin: 24px 0 16px; color: #94a3b8; font-size: 14px; text-transform: uppercase; letter-spacing: 0.05em;">Clients & Payouts</h3>
+        <div class="endpoint-card">
+          <div class="endpoint-method post">POST</div>
+          <div class="endpoint-info">
+            <h4>/api/client</h4>
+            <p>Create a new client</p>
+          </div>
+        </div>
+
+        <div class="endpoint-card">
+          <div class="endpoint-method post">POST</div>
+          <div class="endpoint-info">
+            <h4>/api/payout</h4>
+            <p>Create credit distribution (payout to bank)</p>
+          </div>
+        </div>
+
+        <h3 style="margin: 24px 0 16px; color: #94a3b8; font-size: 14px; text-transform: uppercase; letter-spacing: 0.05em;">Webhooks</h3>
         <div class="endpoint-card">
           <div class="endpoint-method post">POST</div>
           <div class="endpoint-info">

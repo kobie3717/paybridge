@@ -185,6 +185,246 @@ app.post('/api/refund', async (req, res) => {
 });
 
 /**
+ * POST /api/expire-bill - Set bill to expired status
+ */
+app.post('/api/expire-bill', async (req, res) => {
+  stats.requests++;
+
+  try {
+    const { reference, userReference } = req.body;
+    await pay.provider.setBillToExpiredStatus(reference, userReference);
+
+    stats.success++;
+    res.json({ success: true, message: 'Bill expired successfully' });
+  } catch (error) {
+    stats.failed++;
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * POST /api/update-bill - Update bill presentment
+ */
+app.post('/api/update-bill', async (req, res) => {
+  stats.requests++;
+
+  try {
+    const { reference, amount, description, customerName, customerEmail, customerPhone } = req.body;
+    await pay.provider.updateBillPresentment({
+      reference,
+      amount: amount ? parseFloat(amount) : undefined,
+      description,
+      customerName,
+      customerEmail,
+      customerPhone,
+    });
+
+    stats.success++;
+    res.json({ success: true, message: 'Bill updated successfully' });
+  } catch (error) {
+    stats.failed++;
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * GET /api/bill-audits/:reference - List bill presentment audit trail
+ */
+app.get('/api/bill-audits/:reference', async (req, res) => {
+  stats.requests++;
+
+  try {
+    const { reference } = req.params;
+    const { userReference } = req.query;
+    const audits = await pay.provider.listBillPresentmentAudits(
+      reference,
+      userReference || reference
+    );
+
+    stats.success++;
+    res.json({ success: true, audits });
+  } catch (error) {
+    stats.failed++;
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * POST /api/client - Create a new client
+ */
+app.post('/api/client', async (req, res) => {
+  stats.requests++;
+
+  try {
+    const { name, surname, email, phone, idNumber } = req.body;
+    const clientId = await pay.provider.createClient({
+      name,
+      surname,
+      email,
+      phone,
+      idNumber,
+    });
+
+    stats.success++;
+    res.json({ success: true, clientId });
+  } catch (error) {
+    stats.failed++;
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * POST /api/mobi-mandate - Create a Mobi-Mandate (debit order)
+ */
+app.post('/api/mobi-mandate', async (req, res) => {
+  stats.requests++;
+
+  try {
+    const {
+      customerEmail,
+      customerPhone,
+      surname,
+      initials,
+      idNumber,
+      amount,
+      frequency,
+      debitDay,
+      description,
+      contractCode,
+      initialAmount,
+      accountName,
+      accountNumber,
+      branchCode,
+      accountType,
+      expiryDate,
+      commencementDate,
+      collectionMethodTypeId,
+      productId,
+      maxCollectionAmount,
+      successUrl,
+      callbackUrl,
+    } = req.body;
+
+    const mandate = await pay.provider.createMobiMandate({
+      customerEmail,
+      customerPhone,
+      surname,
+      initials,
+      idNumber,
+      amount: parseFloat(amount),
+      frequency: frequency || 'monthly',
+      debitDay: debitDay ? parseInt(debitDay) : undefined,
+      description,
+      contractCode,
+      initialAmount: initialAmount ? parseFloat(initialAmount) : undefined,
+      accountName,
+      accountNumber,
+      branchCode,
+      accountType: accountType ? parseInt(accountType) : undefined,
+      expiryDate,
+      commencementDate,
+      collectionMethodTypeId: collectionMethodTypeId ? parseInt(collectionMethodTypeId) : undefined,
+      productId,
+      maxCollectionAmount: maxCollectionAmount ? parseFloat(maxCollectionAmount) : undefined,
+      successUrl: successUrl || `http://localhost:${PORT}/success.html`,
+      callbackUrl: callbackUrl || `http://localhost:${PORT}/webhook`,
+    });
+
+    stats.success++;
+    res.json({ success: true, mandate });
+  } catch (error) {
+    stats.failed++;
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * POST /api/collection-status - Update collection status
+ */
+app.post('/api/collection-status', async (req, res) => {
+  stats.requests++;
+
+  try {
+    const { collectionId, statusTypeId } = req.body;
+    await pay.provider.updateCollectionStatus({
+      collectionId: parseInt(collectionId),
+      statusTypeId: parseInt(statusTypeId),
+    });
+
+    stats.success++;
+    res.json({ success: true, message: 'Collection status updated' });
+  } catch (error) {
+    stats.failed++;
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * POST /api/payout - Create a credit distribution (payout)
+ */
+app.post('/api/payout', async (req, res) => {
+  stats.requests++;
+
+  try {
+    const { amount, accountNumber, branchCode, accountName, reference, userReference } = req.body;
+    const payout = await pay.provider.createCreditDistribution({
+      amount: parseFloat(amount),
+      accountNumber,
+      branchCode,
+      accountName,
+      reference,
+      userReference: userReference || reference,
+    });
+
+    stats.success++;
+    res.json({ success: true, payout });
+  } catch (error) {
+    stats.failed++;
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * POST /api/reauth-bill - Create re-authentication bill
+ */
+app.post('/api/reauth-bill', async (req, res) => {
+  stats.requests++;
+
+  try {
+    const {
+      oldReference,
+      newReference,
+      amount,
+      customerName,
+      customerEmail,
+      customerPhone,
+      description,
+      billingCycle,
+    } = req.body;
+
+    const bill = await pay.provider.createReauthBill({
+      oldReference,
+      newReference,
+      amount: parseFloat(amount),
+      customerName,
+      customerEmail,
+      customerPhone,
+      description,
+      billingCycle: billingCycle || 'MONTHLY',
+      successUrl: `http://localhost:${PORT}/success.html`,
+      cancelUrl: `http://localhost:${PORT}/cancel.html`,
+      notifyUrl: `http://localhost:${PORT}/webhook`,
+    });
+
+    stats.success++;
+    res.json({ success: true, bill });
+  } catch (error) {
+    stats.failed++;
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+/**
  * POST /webhook - Receive webhooks and broadcast to SSE clients
  */
 app.post('/webhook', (req, res) => {

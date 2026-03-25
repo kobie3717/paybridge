@@ -1,99 +1,103 @@
 # PayBridge Playground
 
-Beautiful interactive payment testing environment for PayBridge SDK.
+**Interactive demonstration of PayBridge — the unified payment SDK for South African payment providers.**
 
-## Features
+![PayBridge](https://img.shields.io/badge/PayBridge-v0.1.3-6C3CE1)
+![SoftyComp](https://img.shields.io/badge/SoftyComp-Complete-10B981)
+![Status](https://img.shields.io/badge/Status-Live-success)
 
-- **Live API Testing** - Test payments against real SoftyComp sandbox
-- **Real-time Webhooks** - See webhook events appear instantly via Server-Sent Events
-- **Code Generator** - Generate TypeScript/JavaScript code snippets
-- **API Explorer** - Browse all available endpoints
-- **Beautiful UI** - Dark mode, modern design, Stripe-docs quality
-
-## Quick Start
+## 🚀 Quick Start
 
 ```bash
-# Install dependencies
-npm install
+# Start the playground
+cd /root/paybridge/playground
+pm2 start server.js --name paybridge-playground
 
-# Start the server
-npm start
+# Or run directly
+node server.js
 ```
 
-Then open http://localhost:4020 in your browser.
+Access at: **http://localhost:4020**
 
-## What You Can Do
+## 📋 Features
 
-### 1. Create Payments
-- One-time payments
-- Monthly subscriptions
-- Yearly subscriptions
-- Test with real SoftyComp sandbox API
+### 8 Interactive Tabs
 
-### 2. Watch Webhooks
-- Real-time webhook notifications via SSE
-- See payment status changes instantly
-- View full webhook payloads
+1. **Dashboard** - Provider status, API health, session statistics
+2. **Create Payment** - One-time payments and recurring subscriptions
+3. **Bill Management** - Update, expire, audit, re-authenticate bills
+4. **Debit Orders** - Mobi-Mandate creation and collection management
+5. **Clients & Payouts** - Client registration and credit distributions
+6. **Webhooks** - Real-time webhook viewer with SSE
+7. **Code Generator** - TypeScript/JavaScript examples with side-by-side comparison
+8. **API Explorer** - Complete API documentation (12 endpoints)
 
-### 3. Generate Code
-- TypeScript and JavaScript examples
-- Copy-paste ready snippets
-- See PayBridge vs raw API comparison
+### Complete SoftyComp Coverage
 
-### 4. Explore API
-- Browse all endpoints
-- See request/response formats
-- Quick-fill forms with examples
+✅ **Bill Presentment** - Create, update, expire, audit bills
+✅ **Debit Orders** - Mobi-Mandate creation and collection management
+✅ **Client Management** - Register new clients
+✅ **Payouts** - Credit distributions (reverse payments)
+✅ **Re-authentication** - Handle card expiry flows
+✅ **Webhooks** - Real-time event notifications with SSE
 
-## Test Cards
+## 🎨 UI/UX
 
-- **4790 4444 xxxx xxxx** - Success (3DS + MOTO)
-- **4790 3333 xxxx xxxx** - 3DS success, MOTO fail
+- **Dark Theme** - Purple branding (#6C3CE1)
+- **Responsive** - Works on mobile, tablet, desktop
+- **Real-time** - Webhook events via Server-Sent Events (SSE)
+- **Code Examples** - Copy-paste ready TypeScript/JavaScript
+- **Side-by-side Comparison** - PayBridge vs Raw SoftyComp API
 
-## Configuration
+## 📡 API Endpoints (12 Total)
 
-The playground uses SoftyComp sandbox credentials (already configured):
+### Payments & Subscriptions
+- `POST /api/payment` - Create payment
+- `POST /api/subscription` - Create subscription
+- `GET /api/payment/:id` - Check status
+- `POST /api/refund` - Process refund
+
+### Bill Management
+- `POST /api/update-bill` - Update bill presentment
+- `POST /api/expire-bill` - Expire bill
+- `GET /api/bill-audits/:reference` - Audit trail
+- `POST /api/reauth-bill` - Re-authentication
+
+### Debit Orders
+- `POST /api/mobi-mandate` - Create Mobi-Mandate
+- `POST /api/collection-status` - Update collection
+
+### Clients & Payouts
+- `POST /api/client` - Create client
+- `POST /api/payout` - Credit distribution
+
+## 🧪 Testing
+
+Run the test script:
+
+```bash
+/root/test-paybridge-new-methods.sh
+```
+
+## 🔐 Credentials
+
+Sandbox mode enabled by default:
 
 ```javascript
-const pay = new PayBridge({
-  provider: 'softycomp',
-  credentials: {
-    apiKey: '97E932D2-EC27-4583-B8E4-EDC87C8019BA',
-    secretKey: 'OEPQKMxopavCtvmvwE3Y'
-  },
+{
+  apiKey: '97E932D2-EC27-4583-B8E4-EDC87C8019BA',
+  secretKey: 'OEPQKMxopavCtvmvwE3Y',
   sandbox: true
-});
+}
 ```
 
-## Architecture
+## 🛠️ Tech Stack
 
-```
-playground/
-├── server.js           # Express server + API proxy
-├── public/
-│   ├── index.html      # Main UI
-│   ├── style.css       # Styling
-│   └── app.js          # Frontend logic
-└── package.json
-```
-
-## Tech Stack
-
-- **Backend**: Express.js
-- **Frontend**: Vanilla HTML/CSS/JS (no build step!)
+- **Backend**: Express.js, PayBridge SDK
+- **Frontend**: Vanilla JavaScript, CSS3
 - **Real-time**: Server-Sent Events (SSE)
-- **Payment SDK**: PayBridge
+- **Payment Provider**: SoftyComp (Sandbox)
 
-## For Demo Purposes Only
+---
 
-This playground is designed for local testing and demos. It:
-- Uses sandbox credentials (safe to commit)
-- Runs on localhost only
-- Not intended for production use
-- Perfect for showcasing PayBridge capabilities
-
-## Powered by PayBridge
-
-One API. Every payment provider.
-
-https://github.com/kobie3717/paybridge
+**Built with PayBridge** — One API. Every payment provider.
