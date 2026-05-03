@@ -16,11 +16,12 @@ import {
   WebhookEvent,
   PaymentStatus,
 } from '../types';
+import { ProviderCapabilities } from '../routing-types';
 
 interface OzowConfig {
   apiKey: string;
   siteCode: string;
-  privateKey: string; // For hash generation
+  privateKey: string;
   sandbox: boolean;
 }
 
@@ -33,6 +34,7 @@ export class OzowProvider extends PaymentProvider {
   private privateKey: string;
   private sandbox: boolean;
   private baseUrl: string;
+  private redirectBaseUrl: string;
 
   constructor(config: OzowConfig) {
     super();
@@ -42,133 +44,131 @@ export class OzowProvider extends PaymentProvider {
     this.privateKey = config.privateKey;
     this.sandbox = config.sandbox;
 
-    // Ozow API endpoints
-    if (this.sandbox) {
-      this.baseUrl = 'https://stagingapi.ozow.com';
-    } else {
-      this.baseUrl = 'https://api.ozow.com';
-    }
+    this.baseUrl = 'https://api.ozow.com';
+    this.redirectBaseUrl = this.sandbox
+      ? 'https://stagingpay.ozow.com'
+      : 'https://pay.ozow.com';
   }
-
-  // ==================== Payment Methods ====================
 
   async createPayment(params: CreatePaymentParams): Promise<PaymentResult> {
     this.validateCurrency(params.currency);
 
-    // TODO: Implement Ozow payment creation
-    // POST /api/payments
-    // Amount in RANDS (not cents)
-    // Requires SHA512 hash of concatenated fields
-    // Auth: API key in header
-    // Body: {
-    //   SiteCode: "...",
-    //   CountryCode: "ZA",
-    //   CurrencyCode: "ZAR",
-    //   Amount: "299.00",
-    //   TransactionReference: "...",
-    //   BankReference: "...",
-    //   Customer: "John Doe",
-    //   Optional1: "email@example.com",
-    //   Optional2: "0825551234",
-    //   Optional3: "...",
-    //   Optional4: "...",
-    //   Optional5: "...",
-    //   CancelUrl: "...",
-    //   ErrorUrl: "...",
-    //   SuccessUrl: "...",
-    //   NotifyUrl: "...",
-    //   IsTest: true/false,
-    //   HashCheck: "sha512_hash"
-    // }
+    const bankReference = this.sanitizeBankReference(params.reference);
 
-    const requestData = {
+    const fields: Record<string, string> = {
       SiteCode: this.siteCode,
       CountryCode: 'ZA',
       CurrencyCode: params.currency,
       Amount: params.amount.toFixed(2),
       TransactionReference: params.reference,
-      BankReference: params.reference,
-      Customer: params.customer.name,
-      Optional1: params.customer.email,
-      Optional2: params.customer.phone || '',
-      Optional3: params.description || '',
+      BankReference: bankReference,
+      Customer: params.customer.name || '',
       CancelUrl: params.urls.cancel,
       ErrorUrl: params.urls.cancel,
       SuccessUrl: params.urls.success,
       NotifyUrl: params.urls.webhook,
-      IsTest: this.sandbox,
-      // HashCheck: this.generateHash(...) // TODO: Implement hash generation
+      IsTest: this.sandbox ? 'true' : 'false',
     };
 
-    // TODO: Generate SHA512 hash
-    // Hash = SHA512(SiteCode + CountryCode + CurrencyCode + Amount + TransactionReference + BankReference + Optional1 + Optional2 + Optional3 + Optional4 + Optional5 + CancelUrl + ErrorUrl + SuccessUrl + NotifyUrl + IsTest + PrivateKey)
+    const fieldOrder = [
+      'SiteCode',
+      'CountryCode',
+      'CurrencyCode',
+      'Amount',
+      'TransactionReference',
+      'BankReference',
+      'Customer',
+      'CancelUrl',
+      'ErrorUrl',
+      'SuccessUrl',
+      'NotifyUrl',
+      'IsTest',
+    ];
 
-    console.warn('[PayBridge:Ozow] createPayment not yet implemented:', requestData);
+    const hashCheck = this.generateHash(fields, fieldOrder);
 
-    throw new Error('Ozow provider not yet fully implemented. Coming soon!');
+    const queryParams = new URLSearchParams();
+    fieldOrder.forEach(key => {
+      queryParams.append(key, fields[key]);
+    });
+    queryParams.append('HashCheck', hashCheck);
+
+    const checkoutUrl = `${this.redirectBaseUrl}?${queryParams.toString()}`;
+
+    return {
+      id: params.reference,
+      checkoutUrl,
+      status: 'pending',
+      amount: params.amount,
+      currency: params.currency,
+      reference: params.reference,
+      provider: 'ozow',
+      createdAt: new Date().toISOString(),
+    };
   }
 
-  async createSubscription(params: CreateSubscriptionParams): Promise<SubscriptionResult> {
-    this.validateCurrency(params.currency);
-
-    // TODO: Implement Ozow recurring payments
-    // Ozow supports recurring payments via their recurring payment API
-    // Different endpoint and structure from one-time payments
-
-    console.warn('[PayBridge:Ozow] createSubscription not yet implemented');
-
-    throw new Error('Ozow subscriptions not yet implemented. Coming soon!');
+  /**
+   * Ozow does not support recurring subscriptions (EFT instant-payment provider)
+   * Use a card-based provider for subscription functionality
+   */
+  async createSubscription(_params: CreateSubscriptionParams): Promise<SubscriptionResult> {
+    throw new Error('Ozow does not support recurring subscriptions. EFT-based provider; use card-based provider for subscriptions.');
   }
 
   async getPayment(id: string): Promise<PaymentResult> {
-    // TODO: Implement Ozow payment status check
-    // GET /api/payments/{transactionReference}
-    // Auth: API key in header
+    const url = `${this.baseUrl}/GetTransactionByReference?siteCode=${this.siteCode}&transactionReference=${encodeURIComponent(id)}`;
 
-    console.warn('[PayBridge:Ozow] getPayment not yet implemented:', id);
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'ApiKey': this.apiKey,
+      },
+    });
 
-    throw new Error('Ozow getPayment not yet implemented. Coming soon!');
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Ozow getPayment failed: ${response.status} - ${errorText}`);
+    }
+
+    const data = (await response.json()) as any;
+
+    if (!Array.isArray(data) || data.length === 0) {
+      throw new Error('Transaction not found');
+    }
+
+    const transaction = data[0];
+    const status = this.mapOzowStatus(transaction.status);
+
+    return {
+      id: transaction.transactionId || id,
+      checkoutUrl: '',
+      status,
+      amount: parseFloat(transaction.amount || '0'),
+      currency: transaction.currencyCode || 'ZAR',
+      reference: transaction.transactionReference || id,
+      provider: 'ozow',
+      createdAt: transaction.createdDate || new Date().toISOString(),
+      raw: transaction,
+    };
   }
 
-  async refund(params: RefundParams): Promise<RefundResult> {
-    // TODO: Implement Ozow refund
-    // POST /api/refunds
-    // Auth: API key in header
-    // Body: {
-    //   SiteCode: "...",
-    //   TransactionReference: "...",
-    //   Amount: "299.00", // optional for partial
-    //   HashCheck: "..."
-    // }
-
-    console.warn('[PayBridge:Ozow] refund not yet implemented:', params);
-
-    throw new Error('Ozow refunds not yet implemented. Coming soon!');
+  /**
+   * Ozow refunds require manual processing via merchant portal
+   * No public API endpoint for instant-EFT refunds
+   */
+  async refund(_params: RefundParams): Promise<RefundResult> {
+    throw new Error('Ozow refunds must be processed manually via merchant.ozow.com — no API support.');
   }
-
-  // ==================== Webhooks ====================
 
   parseWebhook(body: any, _headers?: any): WebhookEvent {
-    const event = typeof body === 'string' ? JSON.parse(body) : body;
+    let event: any;
 
-    // TODO: Map Ozow webhook structure to PayBridge WebhookEvent
-    // Ozow webhook payload structure (form data):
-    // {
-    //   SiteCode: "...",
-    //   TransactionId: "...",
-    //   TransactionReference: "...",
-    //   Amount: "299.00",
-    //   Status: "Complete" | "Cancelled" | "Error" | "Abandoned",
-    //   Optional1: "...",
-    //   Optional2: "...",
-    //   Optional3: "...",
-    //   Optional4: "...",
-    //   Optional5: "...",
-    //   CurrencyCode: "ZAR",
-    //   IsTest: "true" | "false",
-    //   StatusMessage: "...",
-    //   Hash: "sha512_hash"
-    // }
+    if (typeof body === 'string') {
+      const params = new URLSearchParams(body);
+      event = Object.fromEntries(params.entries());
+    } else {
+      event = body;
+    }
 
     const ozowStatus = event.Status;
     const status: PaymentStatus = this.mapOzowStatus(ozowStatus);
@@ -190,24 +190,61 @@ export class OzowProvider extends PaymentProvider {
     };
   }
 
+  /**
+   * Verify Ozow ITN webhook signature
+   * Note: Ozow ITN has no timestamp, so no replay protection possible
+   * Caller should validate idempotency by TransactionId
+   */
   verifyWebhook(body: any, _headers?: any): boolean {
-    const event = typeof body === 'string' ? JSON.parse(body) : body;
+    if (!this.apiKey) {
+      return false;
+    }
+
+    let event: any;
+
+    if (typeof body === 'string') {
+      const params = new URLSearchParams(body);
+      event = Object.fromEntries(params.entries());
+    } else {
+      event = body;
+    }
+
     const receivedHash = event.Hash;
 
     if (!receivedHash) {
-      // No hash provided
-      return true;
+      return false;
     }
-
-    // TODO: Verify Ozow SHA512 hash
-    // expectedHash = SHA512(SiteCode + TransactionId + TransactionReference + Amount + Status + Optional1 + Optional2 + Optional3 + Optional4 + Optional5 + CurrencyCode + IsTest + StatusMessage + PrivateKey)
 
     const expectedHash = this.generateWebhookHash(event);
 
-    return receivedHash === expectedHash;
+    try {
+      const receivedBuffer = Buffer.from(receivedHash);
+      const expectedBuffer = Buffer.from(expectedHash);
+
+      if (receivedBuffer.length !== expectedBuffer.length) {
+        return false;
+      }
+
+      return crypto.timingSafeEqual(receivedBuffer, expectedBuffer);
+    } catch {
+      return false;
+    }
   }
 
-  // ==================== Helpers ====================
+  // ==================== Capabilities ====================
+
+  getCapabilities(): ProviderCapabilities {
+    return {
+      fees: {
+        fixed: 0,
+        percent: 1.5,
+        currency: 'ZAR',
+      },
+      currencies: this.supportedCurrencies,
+      country: 'ZA',
+      avgLatencyMs: 800,
+    };
+  }
 
   private mapOzowStatus(ozowStatus: string): PaymentStatus {
     const statusMap: Record<string, PaymentStatus> = {
@@ -216,6 +253,7 @@ export class OzowProvider extends PaymentProvider {
       Error: 'failed',
       Abandoned: 'cancelled',
       PendingInvestigation: 'pending',
+      Pending: 'pending',
     };
 
     return statusMap[ozowStatus] || 'pending';
@@ -232,26 +270,44 @@ export class OzowProvider extends PaymentProvider {
     return typeMap[ozowStatus] || 'payment.pending';
   }
 
+  private generateHash(fields: Record<string, string>, fieldOrder: string[]): string {
+    const concat = fieldOrder.map(k => fields[k] ?? '').join('') + this.apiKey;
+    return crypto.createHash('sha512').update(concat.toLowerCase()).digest('hex');
+  }
+
   private generateWebhookHash(event: any): string {
-    // TODO: Implement SHA512 hash generation for webhook verification
-    const fields = [
-      event.SiteCode,
-      event.TransactionId,
-      event.TransactionReference,
-      event.Amount,
-      event.Status,
-      event.Optional1 || '',
-      event.Optional2 || '',
-      event.Optional3 || '',
-      event.Optional4 || '',
-      event.Optional5 || '',
-      event.CurrencyCode,
-      event.IsTest,
-      event.StatusMessage || '',
-      this.privateKey,
+    const fieldOrder = [
+      'SiteCode',
+      'TransactionId',
+      'TransactionReference',
+      'Amount',
+      'Status',
+      'Optional1',
+      'Optional2',
+      'Optional3',
+      'Optional4',
+      'Optional5',
+      'CurrencyCode',
+      'IsTest',
+      'StatusMessage',
     ];
 
-    const concatenated = fields.join('');
-    return crypto.createHash('sha512').update(concatenated, 'utf8').digest('hex').toLowerCase();
+    const fields: Record<string, string> = {};
+    fieldOrder.forEach(key => {
+      fields[key] = event[key] || '';
+    });
+
+    const concat = fieldOrder.map(k => fields[k]).join('') + this.apiKey;
+    return crypto.createHash('sha512').update(concat.toLowerCase()).digest('hex');
+  }
+
+  private sanitizeBankReference(reference: string): string {
+    const sanitized = reference.replace(/[^A-Za-z0-9]/g, '').substring(0, 20);
+
+    if (sanitized.length === 0) {
+      throw new Error('Ozow BankReference invalid: must contain at least 1 alphanumeric char');
+    }
+
+    return sanitized;
   }
 }

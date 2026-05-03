@@ -4,13 +4,13 @@
 
 // ==================== Provider Types ====================
 
-export type Provider = 'softycomp' | 'yoco' | 'ozow' | 'payfast' | 'paystack' | 'stripe' | 'peach';
+export type Provider = 'softycomp' | 'yoco' | 'ozow' | 'payfast' | 'paystack' | 'stripe' | 'peach' | 'flutterwave';
 
 export type PaymentStatus = 'pending' | 'completed' | 'failed' | 'cancelled' | 'refunded';
 
 export type SubscriptionInterval = 'weekly' | 'monthly' | 'yearly';
 
-export type Currency = 'ZAR' | 'USD' | 'EUR' | 'GBP' | 'NGN';
+export type Currency = 'ZAR' | 'USD' | 'EUR' | 'GBP' | 'NGN' | 'KES' | 'UGX' | 'GHS' | string;
 
 export type WebhookEventType =
   | 'payment.pending'
@@ -101,6 +101,8 @@ export interface PaymentResult {
   expiresAt?: string;
   /** Raw provider response */
   raw?: any;
+  /** Routing metadata (populated by PayBridgeRouter) */
+  routingMeta?: import('./routing-types').RoutingMeta;
 }
 
 // ==================== Subscription ====================

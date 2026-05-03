@@ -3,6 +3,9 @@ node_modules/
 
 # Build output
 dist/
+dist-tmp/
+tests/**/*.js
+tests/**/*.d.ts
 
 # Environment variables
 .env

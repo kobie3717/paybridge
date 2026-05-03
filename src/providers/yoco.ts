@@ -17,6 +17,7 @@ import {
   PaymentStatus,
 } from '../types';
 import { toMinorUnit, toMajorUnit } from '../utils/currency';
+import { ProviderCapabilities } from '../routing-types';
 
 interface YocoConfig {
   apiKey: string; // Secret key
@@ -49,19 +50,6 @@ export class YocoProvider extends PaymentProvider {
   async createPayment(params: CreatePaymentParams): Promise<PaymentResult> {
     this.validateCurrency(params.currency);
 
-    // TODO: Implement Yoco checkout creation
-    // POST /v1/checkouts
-    // Amount must be in CENTS (minor unit)
-    // Auth: Bearer {secret_key}
-    // Body: {
-    //   amount: 29900, // cents
-    //   currency: "ZAR",
-    //   cancelUrl: "...",
-    //   successUrl: "...",
-    //   failureUrl: "...",
-    //   metadata: { ... }
-    // }
-
     const amountInCents = toMinorUnit(params.amount, params.currency);
 
     const requestBody = {
@@ -72,75 +60,134 @@ export class YocoProvider extends PaymentProvider {
       failureUrl: params.urls.cancel,
       metadata: {
         reference: params.reference,
-        description: params.description,
+        description: params.description || '',
         customerName: params.customer.name,
         customerEmail: params.customer.email,
         ...params.metadata,
       },
     };
 
-    // TODO: Make actual API request
-    console.warn('[PayBridge:Yoco] createPayment not yet implemented:', requestBody);
+    const response = await fetch(`${this.baseUrl}/checkouts`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${this.apiKey}`,
+        'Content-Type': 'application/json',
+        'Idempotency-Key': crypto.randomUUID(),
+      },
+      body: JSON.stringify(requestBody),
+    });
 
-    throw new Error('Yoco provider not yet fully implemented. Coming soon!');
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Yoco API error (POST /checkouts): ${response.status} - ${errorText}`);
+    }
+
+    const data = await response.json() as any;
+
+    return {
+      id: data.id,
+      checkoutUrl: data.redirectUrl,
+      status: this.mapYocoStatus(data.status),
+      amount: toMajorUnit(data.amount, params.currency),
+      currency: data.currency,
+      reference: data.metadata?.reference || params.reference,
+      provider: 'yoco',
+      createdAt: new Date().toISOString(),
+      raw: data,
+    };
   }
 
+  /**
+   * Yoco does not support subscriptions in the standard Online Payments API.
+   * Use the Yoco Recurring Billing API directly or choose another provider.
+   */
   async createSubscription(params: CreateSubscriptionParams): Promise<SubscriptionResult> {
     this.validateCurrency(params.currency);
 
-    // TODO: Implement Yoco subscription creation
-    // Yoco may not support subscriptions directly - need to check their API
-    // May need to implement via recurring charges or use Yoco recurring billing
-
-    console.warn('[PayBridge:Yoco] createSubscription not yet implemented');
-
-    throw new Error('Yoco subscriptions not yet implemented. Coming soon!');
+    throw new Error(
+      'Yoco does not support subscriptions. Use the Yoco Recurring Billing API directly or choose another provider.'
+    );
   }
 
   async getPayment(id: string): Promise<PaymentResult> {
-    // TODO: Implement Yoco payment status check
-    // GET /v1/checkouts/{id}
-    // Auth: Bearer {secret_key}
+    const response = await fetch(`${this.baseUrl}/checkouts/${id}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${this.apiKey}`,
+        'Content-Type': 'application/json',
+      },
+    });
 
-    console.warn('[PayBridge:Yoco] getPayment not yet implemented:', id);
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Yoco API error (GET /checkouts/${id}): ${response.status} - ${errorText}`);
+    }
 
-    throw new Error('Yoco getPayment not yet implemented. Coming soon!');
+    const data = await response.json() as any;
+
+    return {
+      id: data.id,
+      checkoutUrl: data.redirectUrl || '',
+      status: this.mapYocoStatus(data.status),
+      amount: toMajorUnit(data.amount, 'ZAR'),
+      currency: data.currency,
+      reference: data.metadata?.reference || id,
+      provider: 'yoco',
+      createdAt: new Date().toISOString(),
+      raw: data,
+    };
   }
 
   async refund(params: RefundParams): Promise<RefundResult> {
-    // TODO: Implement Yoco refund
-    // POST /v1/refunds
-    // Amount in CENTS
-    // Auth: Bearer {secret_key}
-    // Body: {
-    //   paymentId: "...",
-    //   amount: 29900 // cents, optional for partial refund
-    // }
+    const requestBody: any = {
+      checkoutId: params.paymentId,
+    };
 
-    const amountInCents = params.amount ? toMinorUnit(params.amount, 'ZAR') : undefined;
+    if (params.amount !== undefined) {
+      requestBody.amount = toMinorUnit(params.amount, 'ZAR');
+    }
 
-    console.warn('[PayBridge:Yoco] refund not yet implemented:', { ...params, amountInCents });
+    if (params.reason) {
+      requestBody.metadata = { reason: params.reason };
+    }
 
-    throw new Error('Yoco refunds not yet implemented. Coming soon!');
+    const response = await fetch(`${this.baseUrl}/refunds`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${this.apiKey}`,
+        'Content-Type': 'application/json',
+        'Idempotency-Key': crypto.randomUUID(),
+      },
+      body: JSON.stringify(requestBody),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Yoco API error (POST /refunds): ${response.status} - ${errorText}`);
+    }
+
+    const data = await response.json() as any;
+
+    const status = this.mapYocoStatus(data.status);
+    const refundStatus: 'pending' | 'completed' | 'failed' =
+      status === 'completed' ? 'completed' :
+      status === 'failed' ? 'failed' : 'pending';
+
+    return {
+      id: data.id,
+      status: refundStatus,
+      amount: toMajorUnit(data.amount, 'ZAR'),
+      currency: data.currency,
+      paymentId: params.paymentId,
+      createdAt: new Date().toISOString(),
+      raw: data,
+    };
   }
 
   // ==================== Webhooks ====================
 
   parseWebhook(body: any, _headers?: any): WebhookEvent {
     const event = typeof body === 'string' ? JSON.parse(body) : body;
-
-    // TODO: Map Yoco webhook structure to PayBridge WebhookEvent
-    // Yoco webhook payload structure:
-    // {
-    //   type: "payment.succeeded" | "payment.failed" | "payment.refunded",
-    //   payload: {
-    //     id: "...",
-    //     amount: 29900, // cents
-    //     currency: "ZAR",
-    //     status: "succeeded" | "failed" | "refunded",
-    //     metadata: { ... }
-    //   }
-    // }
 
     const yocoStatus = event.payload?.status || event.status;
     const status: PaymentStatus = this.mapYocoStatus(yocoStatus);
@@ -162,34 +209,97 @@ export class YocoProvider extends PaymentProvider {
     };
   }
 
+  /**
+   * Verify webhook signature using Yoco's Svix-based signing scheme.
+   *
+   * CRITICAL: body must be the raw string or Buffer from the webhook request.
+   * Passing a parsed JSON object will cause signature verification to fail.
+   */
   verifyWebhook(body: string | Buffer, headers?: any): boolean {
-    const signature = headers?.['x-yoco-signature'] || headers?.signature;
-
-    if (!signature || !this.webhookSecret) {
-      // No signature validation configured
-      return true;
+    if (!this.webhookSecret) {
+      return false;
     }
 
-    // TODO: Implement Yoco signature validation
-    // Yoco uses HMAC-SHA256 with X-Yoco-Signature header
-    const expectedSignature = crypto
-      .createHmac('sha256', this.webhookSecret)
-      .update(body)
-      .digest('hex');
+    const webhookId = headers?.['webhook-id'];
+    const webhookTimestamp = headers?.['webhook-timestamp'];
+    const webhookSignature = headers?.['webhook-signature'];
 
-    return signature === expectedSignature;
+    if (!webhookId || !webhookTimestamp || !webhookSignature) {
+      return false;
+    }
+
+    const timestamp = parseInt(webhookTimestamp, 10);
+    const now = Math.floor(Date.now() / 1000);
+
+    if (now - timestamp > 300) {
+      return false;
+    }
+
+    const rawBody = typeof body === 'string' ? body : body.toString('utf8');
+    const signedPayload = `${webhookId}.${webhookTimestamp}.${rawBody}`;
+
+    let secretBytes: Buffer;
+    if (this.webhookSecret.startsWith('whsec_')) {
+      secretBytes = Buffer.from(this.webhookSecret.slice(6), 'base64');
+    } else {
+      secretBytes = Buffer.from(this.webhookSecret, 'utf8');
+    }
+
+    const computedSig = crypto
+      .createHmac('sha256', secretBytes)
+      .update(signedPayload, 'utf8')
+      .digest('base64');
+
+    const signatures = webhookSignature.split(' ');
+    for (const sig of signatures) {
+      const [version, expectedSig] = sig.split(',');
+      if (version === 'v1') {
+        try {
+          const computedBuffer = Buffer.from(computedSig, 'base64');
+          const expectedBuffer = Buffer.from(expectedSig, 'base64');
+
+          if (computedBuffer.length === expectedBuffer.length) {
+            if (crypto.timingSafeEqual(computedBuffer, expectedBuffer)) {
+              return true;
+            }
+          }
+        } catch {
+          continue;
+        }
+      }
+    }
+
+    return false;
+  }
+
+  // ==================== Capabilities ====================
+
+  getCapabilities(): ProviderCapabilities {
+    return {
+      fees: {
+        fixed: 0,
+        percent: 2.95,
+        currency: 'ZAR',
+      },
+      currencies: this.supportedCurrencies,
+      country: 'ZA',
+      avgLatencyMs: 500,
+    };
   }
 
   // ==================== Helpers ====================
 
   private mapYocoStatus(yocoStatus: string): PaymentStatus {
     const statusMap: Record<string, PaymentStatus> = {
+      created: 'pending',
+      pending: 'pending',
+      processing: 'pending',
+      completed: 'completed',
       succeeded: 'completed',
       successful: 'completed',
       failed: 'failed',
       cancelled: 'cancelled',
       refunded: 'refunded',
-      pending: 'pending',
     };
 
     return statusMap[yocoStatus?.toLowerCase()] || 'pending';
@@ -202,6 +312,8 @@ export class YocoProvider extends PaymentProvider {
       'payment.failed': 'payment.failed',
       'payment.cancelled': 'payment.cancelled',
       'payment.refunded': 'refund.completed',
+      'refund.succeeded': 'refund.completed',
+      'refund.failed': 'payment.failed',
     };
 
     return typeMap[yocoType] || 'payment.pending';

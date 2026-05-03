@@ -12,6 +12,7 @@ import {
   RefundResult,
   WebhookEvent,
 } from '../types';
+import { ProviderCapabilities } from '../routing-types';
 
 export abstract class PaymentProvider {
   /**
@@ -54,6 +55,11 @@ export abstract class PaymentProvider {
    * @returns true if signature is valid, false otherwise
    */
   abstract verifyWebhook(body: any, headers?: any): boolean;
+
+  /**
+   * Get provider capabilities (fees, limits, etc)
+   */
+  abstract getCapabilities(): ProviderCapabilities;
 
   /**
    * Validate currency is supported

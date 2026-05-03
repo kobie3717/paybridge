@@ -24,9 +24,15 @@ import {
 
 export * from './types';
 export * from './utils/currency';
+export * from './routing-types';
+export * from './circuit-breaker';
+export * from './circuit-breaker-store';
+export * from './strategies';
+export * from './router';
+export { createRedisCircuitBreakerStore, type RedisLike, type RedisStoreOptions } from './stores/redis';
 
 export class PayBridge {
-  private provider: PaymentProvider;
+  public readonly provider: PaymentProvider;
 
   constructor(config: PayBridgeConfig) {
     this.provider = this.createProvider(config);

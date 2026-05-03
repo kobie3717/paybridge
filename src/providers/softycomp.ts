@@ -15,6 +15,7 @@ import {
   WebhookEvent,
   PaymentStatus,
 } from '../types';
+import { ProviderCapabilities } from '../routing-types';
 
 interface SoftyCompConfig {
   apiKey: string;
@@ -716,6 +717,21 @@ export class SoftyCompProvider extends PaymentProvider {
       startDate: tomorrow.toISOString().split('T')[0],
       billingDay: tomorrow.getDate(),
     });
+  }
+
+  // ==================== Capabilities ====================
+
+  getCapabilities(): ProviderCapabilities {
+    return {
+      fees: {
+        fixed: 0,
+        percent: 2.5,
+        currency: 'ZAR',
+      },
+      currencies: this.supportedCurrencies,
+      country: 'ZA',
+      avgLatencyMs: 800,
+    };
   }
 
   // ==================== Helpers ====================

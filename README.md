@@ -327,6 +327,64 @@ new PayBridge(config: PayBridgeConfig)
 
 See [src/types.ts](src/types.ts) for full type definitions.
 
+## Multi-Provider Routing
+
+PayBridge supports multi-provider routing with automatic failover and circuit breakers. Use `PayBridgeRouter` to route requests across multiple providers based on cost, priority, or round-robin.
+
+```typescript
+import { PayBridge, PayBridgeRouter } from 'paybridge';
+
+const softycomp = new PayBridge({ provider: 'softycomp', credentials: {...}, sandbox: true });
+const yoco = new PayBridge({ provider: 'yoco', credentials: {...}, sandbox: true });
+
+const router = new PayBridgeRouter({
+  providers: [
+    { provider: softycomp, weight: 1 },
+    { provider: yoco, weight: 2 }
+  ],
+  strategy: 'cheapest',
+  fallback: {
+    enabled: true,
+    maxAttempts: 3,
+    retryDelayMs: 250
+  }
+});
+
+const payment = await router.createPayment({
+  amount: 299.00,
+  currency: 'ZAR',
+  reference: 'INV-001',
+  customer: { name: 'John Doe', email: 'john@example.com' },
+  urls: {
+    success: 'https://myapp.com/success',
+    cancel: 'https://myapp.com/cancel',
+    webhook: 'https://myapp.com/webhook'
+  }
+});
+
+console.log(payment.routingMeta.chosenProvider);
+console.log(payment.routingMeta.attempts);
+```
+
+### Multi-instance deployments (Redis circuit-breaker)
+
+By default, each Node process has its own in-memory circuit breaker. To share circuit breaker state across multiple instances (e.g., behind a load balancer), use a Redis-backed store:
+
+```typescript
+import Redis from 'ioredis';
+import { PayBridgeRouter, createRedisCircuitBreakerStore } from 'paybridge';
+
+const redis = new Redis(process.env.REDIS_URL!);
+const store = createRedisCircuitBreakerStore(redis, { prefix: 'app:cb:' });
+
+const router = new PayBridgeRouter({
+  providers: [...],
+  circuitBreakerStore: store,
+});
+```
+
+The Redis adapter works with both `ioredis` and `redis` (node-redis v4+) clients. State is eventually consistent across instances — race conditions during state transitions may cause a few extra failures, but correctness is preserved.
+
 ## Currency Handling
 
 PayBridge **always uses major currency units** (rands, dollars) in the API:
