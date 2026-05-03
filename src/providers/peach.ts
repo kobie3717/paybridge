@@ -17,6 +17,7 @@ import {
   PaymentStatus,
 } from '../types';
 import { ProviderCapabilities } from '../routing-types';
+import { timedFetchOrThrow } from '../utils/fetch';
 
 interface PeachConfig {
   accessToken: string;
@@ -77,7 +78,7 @@ export class PeachProvider extends PaymentProvider {
       body = this.buildFormData(bodyData);
     }
 
-    const response = await fetch(finalUrl, {
+    const response = await timedFetchOrThrow(finalUrl, {
       method,
       headers: {
         Authorization: `Bearer ${this.accessToken}`,
@@ -85,11 +86,6 @@ export class PeachProvider extends PaymentProvider {
       },
       body,
     });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Peach Payments API error (${method} ${path}): ${response.status} - ${errorText}`);
-    }
 
     return (await response.json()) as T;
   }

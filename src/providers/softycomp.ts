@@ -16,6 +16,7 @@ import {
   PaymentStatus,
 } from '../types';
 import { ProviderCapabilities } from '../routing-types';
+import { timedFetchOrThrow } from '../utils/fetch';
 
 interface SoftyCompConfig {
   apiKey: string;
@@ -74,7 +75,7 @@ export class SoftyCompProvider extends PaymentProvider {
       return this.token;
     }
 
-    const response = await fetch(`${this.baseUrl}/api/auth/generatetoken`, {
+    const response = await timedFetchOrThrow(`${this.baseUrl}/api/auth/generatetoken`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -82,11 +83,6 @@ export class SoftyCompProvider extends PaymentProvider {
         apiSecret: this.secretKey,
       }),
     });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`SoftyComp authentication failed: ${response.status} - ${errorText}`);
-    }
 
     const data = (await response.json()) as TokenResponse;
     this.token = data.token;
@@ -98,7 +94,7 @@ export class SoftyCompProvider extends PaymentProvider {
     const token = await this.authenticate();
     const url = `${this.baseUrl}${path}`;
 
-    const response = await fetch(url, {
+    const response = await timedFetchOrThrow(url, {
       method,
       headers: {
         Authorization: `Bearer ${token}`,
@@ -106,11 +102,6 @@ export class SoftyCompProvider extends PaymentProvider {
       },
       body: data ? JSON.stringify(data) : undefined,
     });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`SoftyComp API error (${method} ${path}): ${response.status} - ${errorText}`);
-    }
 
     const contentType = response.headers.get('content-type');
     if (contentType && contentType.includes('application/json')) {

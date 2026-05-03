@@ -12,6 +12,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Yellow Card real spec verification (when partner docs available)
 - CI/CD pipeline with GitHub Actions
 
+## [0.2.2] - 2026-05-03
+
+### Added
+- **`timedFetch` / `timedFetchOrThrow` / `FetchTimeoutError` / `HttpError`** exported from `paybridge`. Default 30s timeout on all internal HTTP calls. Provider hang no longer hangs the SDK. Custom providers can use the same helpers.
+- **Rate-limit awareness in `PayBridgeRouter`** — 429 and 503-with-`Retry-After` responses now skip to the next provider WITHOUT recording a circuit-breaker failure. Reasoning: rate-limiting is provider load, not provider failure. Prevents one busy provider from being marked broken and shut out of routing.
+- `errorCode` field on `RoutingAttempt` (e.g. `'RATE_LIMITED'`, `'TIMEOUT'`) for downstream observability.
+
+### Fixed
+- **MoonPay off-ramp quote** — was calling on-ramp `/v3/currencies/{code}/quote`. Now correctly calls `/v3/currencies/{code}/sell_quote` and swaps `baseCurrencyCode`/`quoteCurrencyCode` for sell direction.
+
+### Changed
+- All provider HTTP calls now go through `timedFetch` (or `timedFetchOrThrow` where the provider previously threw on non-2xx). Default 30s timeout. Override per-call via `timeoutMs` if needed.
+
 ## [0.2.1] - 2026-05-03
 
 ### Fixed

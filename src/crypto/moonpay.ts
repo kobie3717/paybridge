@@ -15,6 +15,7 @@ import {
   CryptoNetwork,
 } from './types';
 import { Currency } from '../types';
+import { timedFetch } from '../utils/fetch';
 
 interface MoonPayConfig {
   apiKey: string;
@@ -56,16 +57,28 @@ export class MoonPayProvider extends CryptoRampProvider {
     cryptoAsset: string,
     _network: string
   ): Promise<RampQuote> {
-    const params = new URLSearchParams({
-      apiKey: this.apiKey,
-      baseCurrencyCode: fiatCurrency.toLowerCase(),
-      quoteCurrencyCode: cryptoAsset.toLowerCase(),
-      baseCurrencyAmount: fiatAmount.toString(),
-    });
+    const endpoint = direction === 'on' ? 'quote' : 'sell_quote';
 
-    const url = `${this.baseUrl}/v3/currencies/${cryptoAsset.toLowerCase()}/quote?${params}`;
+    let params: URLSearchParams;
+    if (direction === 'on') {
+      params = new URLSearchParams({
+        apiKey: this.apiKey,
+        baseCurrencyCode: fiatCurrency.toLowerCase(),
+        quoteCurrencyCode: cryptoAsset.toLowerCase(),
+        baseCurrencyAmount: fiatAmount.toString(),
+      });
+    } else {
+      params = new URLSearchParams({
+        apiKey: this.apiKey,
+        baseCurrencyCode: cryptoAsset.toLowerCase(),
+        quoteCurrencyCode: fiatCurrency.toLowerCase(),
+        baseCurrencyAmount: fiatAmount.toString(),
+      });
+    }
 
-    const response = await fetch(url);
+    const url = `${this.baseUrl}/v3/currencies/${cryptoAsset.toLowerCase()}/${endpoint}?${params}`;
+
+    const response = await timedFetch(url);
     if (!response.ok) {
       throw new Error(`MoonPay quote failed: ${response.status}`);
     }
@@ -130,11 +143,9 @@ export class MoonPayProvider extends CryptoRampProvider {
       validateWalletAddress(params.sourceWallet, params.network);
     }
 
-    // TODO: verify endpoint - use /v3/currencies/{code}/sell_quote?baseCurrencyAmount=...
-    // For now, use getQuote with 'off' direction
     const quote = await this.getQuote(
       'off',
-      0, // Will be calculated from crypto amount
+      params.cryptoAmount,
       params.fiatCurrency,
       params.asset,
       params.network
@@ -171,7 +182,7 @@ export class MoonPayProvider extends CryptoRampProvider {
   }
 
   async getRamp(id: string): Promise<RampResult> {
-    const response = await fetch(`${this.baseUrl}/v3/transactions/${id}`, {
+    const response = await timedFetch(`${this.baseUrl}/v3/transactions/${id}`, {
       headers: {
         Authorization: `Bearer ${this.secretKey}`,
       },

@@ -22,6 +22,7 @@ import {
 } from './routing-types';
 import { ProviderWithMeta, getStrategy, StrategyContext } from './strategies';
 import { CircuitBreaker } from './circuit-breaker';
+import { HttpError, FetchTimeoutError } from './utils/fetch';
 
 function sanitizeErrorMessage(msg: string | undefined): string {
   if (!msg) return 'unknown error';
@@ -143,14 +144,33 @@ export class PayBridgeRouter {
         const latencyMs = Date.now() - startTime;
         lastError = error;
 
-        if (breaker) await breaker.recordFailure();
-        attempts.push({
-          provider: providerName,
-          status: 'failed',
-          errorCode: error.code,
-          errorMessage: sanitizeErrorMessage(error.message),
-          latencyMs,
-        });
+        const isRateLimited = error instanceof HttpError &&
+          (error.status === 429 || (error.status === 503 && error.retryAfterMs !== undefined));
+
+        if (isRateLimited) {
+          attempts.push({
+            provider: providerName,
+            status: 'failed',
+            errorCode: 'RATE_LIMITED',
+            errorMessage: sanitizeErrorMessage(error.message),
+            latencyMs,
+          });
+        } else {
+          if (breaker) await breaker.recordFailure();
+
+          let errorCode = error.code;
+          if (error instanceof FetchTimeoutError) {
+            errorCode = 'TIMEOUT';
+          }
+
+          attempts.push({
+            provider: providerName,
+            status: 'failed',
+            errorCode,
+            errorMessage: sanitizeErrorMessage(error.message),
+            latencyMs,
+          });
+        }
 
         if (!this.fallback.enabled || attempts.length >= (this.fallback.maxAttempts ?? 3)) {
           break;
@@ -220,14 +240,33 @@ export class PayBridgeRouter {
         const latencyMs = Date.now() - startTime;
         lastError = error;
 
-        if (breaker) await breaker.recordFailure();
-        attempts.push({
-          provider: providerName,
-          status: 'failed',
-          errorCode: error.code,
-          errorMessage: sanitizeErrorMessage(error.message),
-          latencyMs,
-        });
+        const isRateLimited = error instanceof HttpError &&
+          (error.status === 429 || (error.status === 503 && error.retryAfterMs !== undefined));
+
+        if (isRateLimited) {
+          attempts.push({
+            provider: providerName,
+            status: 'failed',
+            errorCode: 'RATE_LIMITED',
+            errorMessage: sanitizeErrorMessage(error.message),
+            latencyMs,
+          });
+        } else {
+          if (breaker) await breaker.recordFailure();
+
+          let errorCode = error.code;
+          if (error instanceof FetchTimeoutError) {
+            errorCode = 'TIMEOUT';
+          }
+
+          attempts.push({
+            provider: providerName,
+            status: 'failed',
+            errorCode,
+            errorMessage: sanitizeErrorMessage(error.message),
+            latencyMs,
+          });
+        }
 
         if (!this.fallback.enabled || attempts.length >= (this.fallback.maxAttempts ?? 3)) {
           break;

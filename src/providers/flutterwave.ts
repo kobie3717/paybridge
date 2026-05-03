@@ -18,6 +18,7 @@ import {
   SubscriptionInterval,
 } from '../types';
 import { ProviderCapabilities } from '../routing-types';
+import { timedFetch } from '../utils/fetch';
 
 interface FlutterwaveConfig {
   apiKey: string;
@@ -45,7 +46,7 @@ export class FlutterwaveProvider extends PaymentProvider {
   private async apiRequest<T = any>(method: string, path: string, data?: Record<string, any>): Promise<T> {
     const url = `${this.baseUrl}${path}`;
 
-    const response = await fetch(url, {
+    const response = await timedFetch(url, {
       method,
       headers: {
         Authorization: `Bearer ${this.apiKey}`,

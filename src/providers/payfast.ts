@@ -17,6 +17,7 @@ import {
   PaymentStatus,
 } from '../types';
 import { ProviderCapabilities } from '../routing-types';
+import { timedFetchOrThrow } from '../utils/fetch';
 
 interface PayFastConfig {
   merchantId: string;
@@ -185,7 +186,7 @@ export class PayFastProvider extends PaymentProvider {
     const testingParam = this.sandbox ? '?testing=true' : '';
     const url = `${this.apiBaseUrl}/query/fetch${testingParam}`;
 
-    const response = await fetch(url, {
+    const response = await timedFetchOrThrow(url, {
       method: 'POST',
       headers: {
         ...headers,
@@ -195,11 +196,6 @@ export class PayFastProvider extends PaymentProvider {
         m_payment_id: id,
       }),
     });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`PayFast getPayment failed: ${response.status} - ${errorText}`);
-    }
 
     const data = (await response.json()) as any;
     const status = this.mapPayFastStatus((data as any).status);

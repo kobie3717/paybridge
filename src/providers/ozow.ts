@@ -17,6 +17,7 @@ import {
   PaymentStatus,
 } from '../types';
 import { ProviderCapabilities } from '../routing-types';
+import { timedFetchOrThrow } from '../utils/fetch';
 
 interface OzowConfig {
   apiKey: string;
@@ -118,17 +119,12 @@ export class OzowProvider extends PaymentProvider {
   async getPayment(id: string): Promise<PaymentResult> {
     const url = `${this.baseUrl}/GetTransactionByReference?siteCode=${this.siteCode}&transactionReference=${encodeURIComponent(id)}`;
 
-    const response = await fetch(url, {
+    const response = await timedFetchOrThrow(url, {
       method: 'GET',
       headers: {
         'ApiKey': this.apiKey,
       },
     });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Ozow getPayment failed: ${response.status} - ${errorText}`);
-    }
 
     const data = (await response.json()) as any;
 

@@ -19,6 +19,7 @@ import {
 } from '../types';
 import { toMinorUnit, toMajorUnit } from '../utils/currency';
 import { ProviderCapabilities } from '../routing-types';
+import { timedFetch } from '../utils/fetch';
 
 interface PayStackConfig {
   apiKey: string;
@@ -46,7 +47,7 @@ export class PayStackProvider extends PaymentProvider {
   private async apiRequest<T = any>(method: string, path: string, data?: Record<string, any>): Promise<T> {
     const url = `${this.baseUrl}${path}`;
 
-    const response = await fetch(url, {
+    const response = await timedFetch(url, {
       method,
       headers: {
         Authorization: `Bearer ${this.apiKey}`,

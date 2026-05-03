@@ -18,6 +18,7 @@ import {
 } from '../types';
 import { toMinorUnit, toMajorUnit } from '../utils/currency';
 import { ProviderCapabilities } from '../routing-types';
+import { timedFetchOrThrow } from '../utils/fetch';
 
 interface YocoConfig {
   apiKey: string; // Secret key
@@ -67,7 +68,7 @@ export class YocoProvider extends PaymentProvider {
       },
     };
 
-    const response = await fetch(`${this.baseUrl}/checkouts`, {
+    const response = await timedFetchOrThrow(`${this.baseUrl}/checkouts`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${this.apiKey}`,
@@ -76,11 +77,6 @@ export class YocoProvider extends PaymentProvider {
       },
       body: JSON.stringify(requestBody),
     });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Yoco API error (POST /checkouts): ${response.status} - ${errorText}`);
-    }
 
     const data = await response.json() as any;
 
@@ -110,18 +106,13 @@ export class YocoProvider extends PaymentProvider {
   }
 
   async getPayment(id: string): Promise<PaymentResult> {
-    const response = await fetch(`${this.baseUrl}/checkouts/${id}`, {
+    const response = await timedFetchOrThrow(`${this.baseUrl}/checkouts/${id}`, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${this.apiKey}`,
         'Content-Type': 'application/json',
       },
     });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Yoco API error (GET /checkouts/${id}): ${response.status} - ${errorText}`);
-    }
 
     const data = await response.json() as any;
 
@@ -151,7 +142,7 @@ export class YocoProvider extends PaymentProvider {
       requestBody.metadata = { reason: params.reason };
     }
 
-    const response = await fetch(`${this.baseUrl}/refunds`, {
+    const response = await timedFetchOrThrow(`${this.baseUrl}/refunds`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${this.apiKey}`,
@@ -160,11 +151,6 @@ export class YocoProvider extends PaymentProvider {
       },
       body: JSON.stringify(requestBody),
     });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Yoco API error (POST /refunds): ${response.status} - ${errorText}`);
-    }
 
     const data = await response.json() as any;
 

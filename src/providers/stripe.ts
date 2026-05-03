@@ -19,6 +19,7 @@ import {
 } from '../types';
 import { toMinorUnit, toMajorUnit } from '../utils/currency';
 import { ProviderCapabilities } from '../routing-types';
+import { timedFetchOrThrow } from '../utils/fetch';
 
 interface StripeConfig {
   apiKey: string;
@@ -65,7 +66,7 @@ export class StripeProvider extends PaymentProvider {
     const url = `${this.baseUrl}${path}`;
     const body = data ? this.buildFormData(data) : undefined;
 
-    const response = await fetch(url, {
+    const response = await timedFetchOrThrow(url, {
       method,
       headers: {
         Authorization: `Bearer ${this.apiKey}`,
@@ -73,11 +74,6 @@ export class StripeProvider extends PaymentProvider {
       },
       body,
     });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Stripe API error (${method} ${path}): ${response.status} - ${errorText}`);
-    }
 
     return (await response.json()) as T;
   }

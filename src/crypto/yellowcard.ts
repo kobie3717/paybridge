@@ -26,6 +26,7 @@ import {
   RampResult,
   CryptoRampCapabilities,
 } from './types';
+import { timedFetch } from '../utils/fetch';
 
 interface YellowCardConfig {
   apiKey: string;
@@ -328,7 +329,7 @@ export class YellowCardProvider extends CryptoRampProvider {
     // Current: X-API-Key, X-Timestamp, X-Signature
     // Common alternatives: X-YC-API-Key, X-YC-Timestamp, X-YC-Signature
     // Or: Authorization header + separate X-Signature
-    const response = await fetch(url, {
+    const response = await timedFetch(url, {
       method,
       headers: {
         'Content-Type': 'application/json',

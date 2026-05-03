@@ -29,6 +29,7 @@ import {
 
 export * from './types';
 export * from './utils/currency';
+export * from './utils/fetch';
 export * from './routing-types';
 export * from './circuit-breaker';
 export * from './circuit-breaker-store';
