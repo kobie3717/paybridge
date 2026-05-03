@@ -9,6 +9,11 @@ import { PaymentProvider } from './providers/base';
 import { SoftyCompProvider } from './providers/softycomp';
 import { YocoProvider } from './providers/yoco';
 import { OzowProvider } from './providers/ozow';
+import { PeachProvider } from './providers/peach';
+import { StripeProvider } from './providers/stripe';
+import { PayFastProvider } from './providers/payfast';
+import { PayStackProvider } from './providers/paystack';
+import { FlutterwaveProvider } from './providers/flutterwave';
 
 import {
   PayBridgeConfig,
@@ -29,6 +34,7 @@ export * from './circuit-breaker';
 export * from './circuit-breaker-store';
 export * from './strategies';
 export * from './router';
+export * from './crypto';
 export { createRedisCircuitBreakerStore, type RedisLike, type RedisStoreOptions } from './stores/redis';
 
 export class PayBridge {
@@ -77,12 +83,58 @@ export class PayBridge {
           sandbox,
         });
 
-      case 'payfast':
-      case 'paystack':
       case 'stripe':
-      case 'peach':
-        throw new Error(`Provider ${provider} not yet implemented. Coming soon!`);
+        if (!credentials.apiKey) {
+          throw new Error('Stripe requires apiKey (secret key, sk_test_* or sk_live_*)');
+        }
+        return new StripeProvider({
+          apiKey: credentials.apiKey,
+          webhookSecret,
+          sandbox,
+        });
 
+      case 'payfast':
+        if (!credentials.merchantId || !credentials.merchantKey) {
+          throw new Error('PayFast requires merchantId and merchantKey');
+        }
+        return new PayFastProvider({
+          merchantId: credentials.merchantId,
+          merchantKey: credentials.merchantKey,
+          passphrase: credentials.passphrase,
+          sandbox,
+          webhookSecret,
+        });
+
+      case 'paystack':
+        if (!credentials.apiKey) {
+          throw new Error('PayStack requires apiKey (secret key, sk_test_* or sk_live_*)');
+        }
+        return new PayStackProvider({
+          apiKey: credentials.apiKey,
+          sandbox,
+          webhookSecret,
+        });
+
+      case 'peach':
+        if (!credentials.apiKey || !credentials.secretKey) {
+          throw new Error('Peach Payments requires apiKey (access token) and secretKey (entityId)');
+        }
+        return new PeachProvider({
+          accessToken: credentials.apiKey,
+          entityId: credentials.secretKey,
+          sandbox,
+          webhookSecret,
+        });
+
+      case 'flutterwave':
+        if (!credentials.apiKey) {
+          throw new Error('Flutterwave requires apiKey (FLWSECK_TEST-* or FLWSECK-*)');
+        }
+        return new FlutterwaveProvider({
+          apiKey: credentials.apiKey,
+          sandbox,
+          webhookSecret,
+        });
       default:
         throw new Error(`Unknown provider: ${provider}`);
     }

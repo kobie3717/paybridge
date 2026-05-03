@@ -179,17 +179,32 @@ app.post('/webhook', express.raw({ type: 'application/json' }), (req, res) => {
 
 ## Supported Providers
 
+### Fiat providers
+
 | Provider | One-time | Subscriptions | Refunds | Webhooks | Status |
 |----------|----------|---------------|---------|----------|--------|
 | **SoftyComp** | ✅ | ✅ | ✅ | ✅ | **Production** |
-| **Yoco** | 🚧 | 🚧 | 🚧 | 🚧 | Coming soon |
-| **Ozow** | 🚧 | 🚧 | 🚧 | 🚧 | Coming soon |
-| **PayFast** | 📋 | 📋 | 📋 | 📋 | Planned |
-| **PayStack** | 📋 | 📋 | 📋 | 📋 | Planned |
-| **Stripe** | 📋 | 📋 | 📋 | 📋 | Planned |
-| **Peach Payments** | 📋 | 📋 | 📋 | 📋 | Planned |
+| **Yoco** | ✅ | ⛔ | ✅ | ✅ | **Production** |
+| **Ozow** | ✅ | ⛔ | ⛔ | ✅ | **Production** |
+| **PayFast** | ✅ | ✅ | ✅ | ✅ | **Production** |
+| **PayStack** | ✅ | ✅ | ✅ | ✅ | **Production** |
+| **Stripe** | ✅ | ✅ | ✅ | ✅ | **Production** |
+| **Peach Payments** | ✅ | ⛔ | ✅ | ✅ | **Production** |
+| **Flutterwave** | ✅ | ✅ | ✅ | ✅ | **Production** |
 
-**Legend:** ✅ Production ready | 🚧 In development | 📋 Planned
+### Crypto on/off-ramp providers
+
+| Provider | On-ramp | Off-ramp | Quote | Webhooks | Status |
+|----------|---------|----------|-------|----------|--------|
+| **MoonPay** | ✅ | ✅ | ✅ | ✅ | **Production** |
+| **Yellow Card** | ⚠️ | ⚠️ | ⚠️ | ⚠️ | **Experimental** |
+
+**Legend:** ✅ Supported | ⛔ Not supported by upstream API | ⚠️ Experimental (spec unverified)
+
+**Notes:**
+- `⛔` marks features the underlying provider's API doesn't support — those methods throw a clear error explaining the limitation. Use a different provider for that capability or use `PayBridgeRouter` to route accordingly.
+- **Yellow Card** is gated behind `@experimental` until partner API documentation is verified — it logs a warning on instantiation. Do not use in production without partner-confirmed spec.
+- **Sandbox testing.** PayFast / PayStack / Stripe / Peach / Flutterwave are wired and unit-tested, but have not yet been validated against live sandbox credentials. Run a sandbox transaction before going live.
 
 ## Provider Configuration
 

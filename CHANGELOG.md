@@ -12,6 +12,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Yellow Card real spec verification (when partner docs available)
 - CI/CD pipeline with GitHub Actions
 
+## [0.2.1] - 2026-05-03
+
+### Fixed
+- **Factory wiring restored** — `case 'stripe' | 'payfast' | 'paystack' | 'peach' | 'flutterwave':` were throwing `not yet implemented` despite the provider classes being fully built and tested. Lost during a mid-development rebase. All 8 fiat providers now reachable via `new PayBridge({ provider: '...' })`. Crypto exports (`./crypto`) also restored.
+
+### Changed
+- **README provider matrix** — replaced "Coming soon" / "Planned" rows with accurate Production status for the 7 providers shipped in 0.2.0. Added Flutterwave (was missing). Added Crypto provider matrix. Marked Yoco/Ozow/Peach features that throw cleanly per upstream API limits with `⛔` instead of misleading checkmarks. Added "Sandbox testing" note for the 5 providers that are wired and unit-tested but not yet validated against live credentials.
+
 ## [0.2.0] - 2026-05-03
 
 ### Added
