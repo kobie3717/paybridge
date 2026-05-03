@@ -6,7 +6,8 @@
   "types": "dist/index.d.ts",
   "scripts": {
     "build": "tsc",
-    "prepublishOnly": "npm run build",
+    "clean": "rm -rf dist",
+    "prepublishOnly": "npm run clean && npm run build",
     "test": "tsc && node --test dist/tests/*.test.js",
     "test:e2e:moonpay": "tsx tests/e2e/moonpay-sandbox.ts",
     "test:e2e:yellowcard": "tsx tests/e2e/yellowcard-sandbox.ts"
