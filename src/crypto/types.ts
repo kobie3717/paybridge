@@ -96,5 +96,6 @@ export interface CryptoRampCapabilities {
     onRampPercent: number;
     offRampPercent: number;
   };
+  avgLatencyMs?: number;
   experimental?: boolean;
 }

@@ -37,8 +37,12 @@ export interface CryptoRampConfig {
 export class CryptoRamp {
   private provider: CryptoRampProvider;
 
-  constructor(config: CryptoRampConfig) {
-    this.provider = this.createProvider(config);
+  constructor(config: CryptoRampConfig | { provider: CryptoRampProvider }) {
+    if ('provider' in config && typeof config.provider === 'object' && 'name' in config.provider) {
+      this.provider = config.provider as CryptoRampProvider;
+    } else {
+      this.provider = this.createProvider(config as CryptoRampConfig);
+    }
   }
 
   private createProvider(config: CryptoRampConfig): CryptoRampProvider {

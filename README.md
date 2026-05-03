@@ -50,6 +50,8 @@ Perfect for demos, learning, and rapid prototyping. See [playground/README.md](p
 
 ## Quick Start
 
+> **Upgrading from 0.1 or 0.2?** See [docs/migration.md](docs/migration.md).
+
 ### One-time Payment
 
 ```typescript

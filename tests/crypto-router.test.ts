@@ -98,6 +98,7 @@ class HighFeeMockProvider extends CryptoRampProvider {
         onRampPercent: 5.0,
         offRampPercent: 4.0,
       },
+      avgLatencyMs: 1500,
     };
   }
 }
@@ -473,5 +474,269 @@ describe('CryptoRampRouter', () => {
     } catch (error: any) {
       assert.ok(error.message.includes('Invalid amount'));
     }
+  });
+
+  it('should use fastest strategy (lowest avgLatencyMs)', async () => {
+    class FastProvider extends CryptoRampProvider {
+      readonly name = 'fast-provider';
+
+      async getQuote(direction: 'on' | 'off', fiatAmount: number): Promise<RampQuote> {
+        return {
+          fiatAmount,
+          cryptoAmount: 0.01,
+          rate: 50000,
+          feeFixed: 0,
+          feePercent: 2.0,
+          feeTotal: fiatAmount * 0.02,
+          expiresAt: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
+        };
+      }
+
+      async createOnRamp(params: OnRampParams): Promise<RampResult> {
+        const quote = await this.getQuote('on', params.fiatAmount);
+        return {
+          id: 'fast_on_1',
+          direction: 'on',
+          status: 'pending',
+          quote,
+          checkoutUrl: 'https://fast.example.com',
+          createdAt: new Date().toISOString(),
+        };
+      }
+
+      async createOffRamp(params: OffRampParams): Promise<RampResult> {
+        const fiatAmount = params.cryptoAmount * 50000;
+        const quote = await this.getQuote('off', fiatAmount);
+        return {
+          id: 'fast_off_1',
+          direction: 'off',
+          status: 'pending',
+          quote,
+          depositAddress: '0xFAST',
+          createdAt: new Date().toISOString(),
+        };
+      }
+
+      async getRamp(id: string): Promise<RampResult> {
+        throw new Error('Not implemented');
+      }
+
+      parseWebhook(body: any): any {
+        return body;
+      }
+
+      verifyWebhook(): boolean {
+        return true;
+      }
+
+      getCapabilities(): CryptoRampCapabilities {
+        return {
+          supportedAssets: ['BTC', 'ETH'],
+          supportedNetworks: ['BTC', 'ETH'],
+          supportedFiat: ['USD', 'ZAR'],
+          country: 'GLOBAL',
+          kycRequired: false,
+          fees: { onRampPercent: 2.0, offRampPercent: 2.0 },
+          avgLatencyMs: 500,
+        };
+      }
+    }
+
+    class SlowProvider extends CryptoRampProvider {
+      readonly name = 'slow-provider';
+
+      async getQuote(direction: 'on' | 'off', fiatAmount: number): Promise<RampQuote> {
+        return {
+          fiatAmount,
+          cryptoAmount: 0.01,
+          rate: 50000,
+          feeFixed: 0,
+          feePercent: 1.0,
+          feeTotal: fiatAmount * 0.01,
+          expiresAt: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
+        };
+      }
+
+      async createOnRamp(): Promise<RampResult> {
+        throw new Error('Should not be called');
+      }
+
+      async createOffRamp(): Promise<RampResult> {
+        throw new Error('Should not be called');
+      }
+
+      async getRamp(): Promise<RampResult> {
+        throw new Error('Not implemented');
+      }
+
+      parseWebhook(body: any): any {
+        return body;
+      }
+
+      verifyWebhook(): boolean {
+        return true;
+      }
+
+      getCapabilities(): CryptoRampCapabilities {
+        return {
+          supportedAssets: ['BTC', 'ETH'],
+          supportedNetworks: ['BTC', 'ETH'],
+          supportedFiat: ['USD', 'ZAR'],
+          country: 'GLOBAL',
+          kycRequired: false,
+          fees: { onRampPercent: 1.0, offRampPercent: 1.0 },
+          avgLatencyMs: 2000,
+        };
+      }
+    }
+
+    const fast = new CryptoRamp({ provider: new FastProvider() });
+    const slow = new CryptoRamp({ provider: new SlowProvider() });
+
+    const router = new CryptoRampRouter({
+      providers: [{ provider: slow }, { provider: fast }],
+      strategy: 'fastest',
+      fallback: { enabled: false },
+    });
+
+    const result = await router.createOnRamp({
+      fiatAmount: 1000,
+      fiatCurrency: 'ZAR',
+      asset: 'BTC',
+      network: 'BTC',
+      destinationWallet: '1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa',
+      customer: { name: 'Test', email: 'test@example.com' },
+      urls: {
+        success: 'https://example.com/success',
+        cancel: 'https://example.com/cancel',
+        webhook: 'https://example.com/webhook',
+      },
+      reference: 'TEST-FASTEST',
+    });
+
+    assert.strictEqual(result.routingMeta?.chosenProvider, 'fast-provider');
+  });
+
+  it('should sort providers with undefined latency last in fastest strategy', async () => {
+    class NoLatencyProvider extends CryptoRampProvider {
+      readonly name = 'no-latency';
+
+      async getQuote(): Promise<RampQuote> {
+        throw new Error('Should not be called');
+      }
+
+      async createOnRamp(): Promise<RampResult> {
+        throw new Error('Should not be called');
+      }
+
+      async createOffRamp(): Promise<RampResult> {
+        throw new Error('Should not be called');
+      }
+
+      async getRamp(): Promise<RampResult> {
+        throw new Error('Not implemented');
+      }
+
+      parseWebhook(body: any): any {
+        return body;
+      }
+
+      verifyWebhook(): boolean {
+        return true;
+      }
+
+      getCapabilities(): CryptoRampCapabilities {
+        return {
+          supportedAssets: ['BTC'],
+          supportedNetworks: ['BTC'],
+          supportedFiat: ['ZAR'],
+          country: 'GLOBAL',
+          kycRequired: false,
+          fees: { onRampPercent: 1.0, offRampPercent: 1.0 },
+        };
+      }
+    }
+
+    class HasLatencyProvider extends CryptoRampProvider {
+      readonly name = 'has-latency';
+
+      async getQuote(direction: 'on' | 'off', fiatAmount: number): Promise<RampQuote> {
+        return {
+          fiatAmount,
+          cryptoAmount: 0.01,
+          rate: 50000,
+          feeFixed: 0,
+          feePercent: 2.0,
+          feeTotal: fiatAmount * 0.02,
+          expiresAt: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
+        };
+      }
+
+      async createOnRamp(params: OnRampParams): Promise<RampResult> {
+        const quote = await this.getQuote('on', params.fiatAmount);
+        return {
+          id: 'has_lat_1',
+          direction: 'on',
+          status: 'pending',
+          quote,
+          checkoutUrl: 'https://haslatency.example.com',
+          createdAt: new Date().toISOString(),
+        };
+      }
+
+      async createOffRamp(): Promise<RampResult> {
+        throw new Error('Not implemented');
+      }
+
+      async getRamp(): Promise<RampResult> {
+        throw new Error('Not implemented');
+      }
+
+      parseWebhook(body: any): any {
+        return body;
+      }
+
+      verifyWebhook(): boolean {
+        return true;
+      }
+
+      getCapabilities(): CryptoRampCapabilities {
+        return {
+          supportedAssets: ['BTC'],
+          supportedNetworks: ['BTC'],
+          supportedFiat: ['ZAR'],
+          country: 'GLOBAL',
+          kycRequired: false,
+          fees: { onRampPercent: 2.0, offRampPercent: 2.0 },
+          avgLatencyMs: 1000,
+        };
+      }
+    }
+
+    const noLatency = new CryptoRamp({ provider: new NoLatencyProvider() });
+    const hasLatency = new CryptoRamp({ provider: new HasLatencyProvider() });
+
+    const router = new CryptoRampRouter({
+      providers: [{ provider: noLatency }, { provider: hasLatency }],
+      strategy: 'fastest',
+      fallback: { enabled: false },
+    });
+
+    const result = await router.createOnRamp({
+      fiatAmount: 1000,
+      fiatCurrency: 'ZAR',
+      asset: 'BTC',
+      network: 'BTC',
+      destinationWallet: '1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa',
+      customer: { name: 'Test', email: 'test@example.com' },
+      urls: {
+        success: 'https://example.com/success',
+        cancel: 'https://example.com/cancel',
+        webhook: 'https://example.com/webhook',
+      },
+      reference: 'TEST-LATENCY-SORT',
+    });
+
+    assert.strictEqual(result.routingMeta?.chosenProvider, 'has-latency');
   });
 });

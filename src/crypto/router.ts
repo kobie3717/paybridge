@@ -26,10 +26,11 @@ function sanitizeErrorMessage(msg: string | undefined): string {
 
 export interface CryptoRampRouterConfig {
   providers: Array<{ provider: CryptoRamp; priority?: number }>;
-  strategy?: 'cheapest' | 'priority' | 'round-robin';
+  strategy?: 'cheapest' | 'priority' | 'round-robin' | 'fastest';
   fallback?: { enabled: boolean; maxAttempts?: number; retryDelayMs?: number };
   allowExperimental?: boolean;
   circuitBreakerStore?: import('../circuit-breaker-store').CircuitBreakerStore;
+  idempotencyStore?: import('../webhook-idempotency-store').IdempotencyStore;
 }
 
 interface ProviderWithMeta {
@@ -37,7 +38,7 @@ interface ProviderWithMeta {
   priority?: number;
 }
 
-type CryptoStrategy = 'cheapest' | 'priority' | 'round-robin';
+type CryptoStrategy = 'cheapest' | 'priority' | 'round-robin' | 'fastest';
 
 export class CryptoRampRouter {
   private providers: ProviderWithMeta[];
@@ -380,6 +381,17 @@ export class CryptoRampRouter {
             direction === 'on' ? capsB.fees.onRampPercent : capsB.fees.offRampPercent;
 
           return feeA - feeB;
+        });
+
+      case 'fastest':
+        return [...providers].sort((a, b) => {
+          const capsA = a.instance.getCapabilities();
+          const capsB = b.instance.getCapabilities();
+
+          const latencyA = capsA.avgLatencyMs ?? Number.MAX_SAFE_INTEGER;
+          const latencyB = capsB.avgLatencyMs ?? Number.MAX_SAFE_INTEGER;
+
+          return latencyA - latencyB;
         });
 
       case 'priority':

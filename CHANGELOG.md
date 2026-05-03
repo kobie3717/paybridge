@@ -8,9 +8,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Planned
-- Redis-backed circuit-breaker for multi-instance deployments
 - Yellow Card real spec verification (when partner docs available)
-- CI/CD pipeline with GitHub Actions
+
+## [0.3.0] - 2026-05-03
+
+### BREAKING
+- **`PayBridgeRouter.parseWebhook` is now async** (returns `Promise<WebhookEvent>`, was `WebhookEvent`). Required for the new idempotency store's async dedup check. Callers must `await` the result. `PayBridge.parseWebhook` (single-provider class) is unchanged. See `docs/migration.md` for upgrade snippets. Pre-1.0 minor allowed under semver `0.x.y` initial-development clause.
+
+### Added
+- **Webhook idempotency store** — prevents duplicate webhook processing. `InMemoryIdempotencyStore` for single-instance deployments, `createRedisIdempotencyStore` for multi-instance (shares state via Redis). Optional `idempotencyStore` config on `PayBridgeRouter`. When enabled, `parseWebhook` deduplicates by event ID and throws `WebhookDuplicateError` on duplicates. Default 24h TTL. Opt-in (backwards-compatible).
+- **Crypto router `fastest` strategy** — `CryptoRampRouter` now supports `strategy: 'fastest'` (sorts providers by `avgLatencyMs`, ascending). Providers with `null`/`undefined` latency sort last.
+- **Migration guide** — comprehensive upgrade guide at `docs/migration.md` covering 0.1 → 0.2 and 0.2 → 0.3 breaking changes, new features, and code examples.
+- **Multi-provider example** — `examples/multi-provider.ts` demonstrates `PayBridgeRouter` with 4 SA providers, `cheapest` strategy, `InMemoryIdempotencyStore`, and webhook idempotency handling. Runnable TypeScript example with expected output comments.
+
+### Changed
+- `PayBridgeRouter.parseWebhook` is now `async` and returns `Promise<WebhookEvent>` (was synchronous). Required for idempotency store async lookups. Callers must `await` the result.
+- Fiat `fastest` strategy now sorts providers with `null`/`undefined` `avgLatencyMs` last (was defaulting to 1000ms). More predictable behavior when latency data is incomplete.
 
 ## [0.2.3] - 2026-05-03
 

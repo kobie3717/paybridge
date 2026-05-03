@@ -41,8 +41,8 @@ export const strategies: Record<RoutingStrategy, Strategy> = {
       const capsA = a.instance.provider.getCapabilities();
       const capsB = b.instance.provider.getCapabilities();
 
-      const latencyA = capsA.avgLatencyMs ?? 1000;
-      const latencyB = capsB.avgLatencyMs ?? 1000;
+      const latencyA = capsA.avgLatencyMs ?? Number.MAX_SAFE_INTEGER;
+      const latencyB = capsB.avgLatencyMs ?? Number.MAX_SAFE_INTEGER;
 
       return latencyA - latencyB;
     });

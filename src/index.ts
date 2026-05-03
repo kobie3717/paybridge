@@ -36,7 +36,9 @@ export * from './circuit-breaker-store';
 export * from './strategies';
 export * from './router';
 export * from './crypto';
+export * from './webhook-idempotency-store';
 export { createRedisCircuitBreakerStore, type RedisLike, type RedisStoreOptions } from './stores/redis';
+export { createRedisIdempotencyStore, type RedisIdempotencyStoreOptions } from './stores/redis-idempotency';
 
 export class PayBridge {
   public readonly provider: PaymentProvider;

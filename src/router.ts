@@ -23,6 +23,7 @@ import {
 import { ProviderWithMeta, getStrategy, StrategyContext } from './strategies';
 import { CircuitBreaker } from './circuit-breaker';
 import { HttpError, FetchTimeoutError } from './utils/fetch';
+import type { IdempotencyStore } from './webhook-idempotency-store';
 
 function sanitizeErrorMessage(msg: string | undefined): string {
   if (!msg) return 'unknown error';
@@ -30,6 +31,17 @@ function sanitizeErrorMessage(msg: string | undefined): string {
     .replace(/\b[A-Za-z0-9_-]{32,}\b/g, '[REDACTED]')
     .replace(/(api[_-]?key|secret|token|password)["':=\s]+\S+/gi, '$1=[REDACTED]')
     .slice(0, 500);
+}
+
+export class WebhookDuplicateError extends Error {
+  readonly name = 'WebhookDuplicateError';
+  readonly eventId: string;
+  readonly provider: string;
+  constructor(provider: string, eventId: string) {
+    super(`Webhook event already processed: ${provider}:${eventId}`);
+    this.eventId = eventId;
+    this.provider = provider;
+  }
 }
 
 export interface PayBridgeRouterConfig {
@@ -41,6 +53,7 @@ export interface PayBridgeRouterConfig {
   strategy?: RoutingStrategy;
   fallback?: FallbackConfig;
   circuitBreakerStore?: import('./circuit-breaker-store').CircuitBreakerStore;
+  idempotencyStore?: IdempotencyStore;
 }
 
 export class PayBridgeRouter {
@@ -48,6 +61,7 @@ export class PayBridgeRouter {
   private strategy: RoutingStrategy;
   private fallback: FallbackConfig;
   private circuitBreakers: Map<string, CircuitBreaker>;
+  private idempotencyStore?: IdempotencyStore;
   private rrIndex = 0;
   private config: PayBridgeRouterConfig;
 
@@ -64,6 +78,7 @@ export class PayBridgeRouter {
       maxAttempts: config.fallback?.maxAttempts ?? 3,
       retryDelayMs: config.fallback?.retryDelayMs ?? 250,
     };
+    this.idempotencyStore = config.idempotencyStore;
     this.circuitBreakers = new Map();
 
     for (const p of this.providers) {
@@ -332,14 +347,28 @@ export class PayBridgeRouter {
     );
   }
 
-  parseWebhook(body: any, headers: any, providerName: Provider): WebhookEvent {
+  async parseWebhook(body: any, headers: any, providerName: Provider): Promise<WebhookEvent> {
     const providerMeta = this.providers.find(
       p => p.instance.getProviderName() === providerName
     );
     if (!providerMeta) {
       throw new Error(`Unknown provider for webhook: ${providerName}`);
     }
-    return providerMeta.instance.parseWebhook(body, headers);
+    const event = providerMeta.instance.parseWebhook(body, headers);
+
+    if (this.idempotencyStore) {
+      const eventId = event.payment?.id || event.subscription?.id || event.refund?.id;
+      if (eventId) {
+        const key = `${providerName}:${eventId}`;
+        const ttlMs = 24 * 60 * 60 * 1000;
+        const isNew = await this.idempotencyStore.recordIfNew(key, ttlMs);
+        if (!isNew) {
+          throw new WebhookDuplicateError(providerName, eventId);
+        }
+      }
+    }
+
+    return event;
   }
 
   verifyWebhook(body: any, headers: any, providerName: Provider): boolean {
