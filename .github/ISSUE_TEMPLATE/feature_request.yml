@@ -1,0 +1,61 @@
+name: Feature Request
+description: Suggest a new feature or enhancement
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for suggesting a feature! Please describe your use case and proposed solution.
+
+  - type: textarea
+    id: use-case
+    attributes:
+      label: Use Case
+      description: What problem does this feature solve? What are you trying to achieve?
+      placeholder: "I need to support recurring subscriptions with variable amounts (e.g., utility bills)"
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposed-api
+    attributes:
+      label: Proposed API (optional)
+      description: How would you like the API to look? Provide example code if possible.
+      placeholder: |
+        const subscription = await pay.createVariableSubscription({
+          amount: { min: 50, max: 500 },
+          interval: 'monthly',
+          reference: 'SUB-001',
+          // ...
+        });
+      render: typescript
+    validations:
+      required: false
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives Considered
+      description: What other approaches have you considered? Why doesn't the current API work?
+      placeholder: "I tried using one-time payments, but managing the schedule manually is error-prone"
+    validations:
+      required: false
+
+  - type: dropdown
+    id: willing-to-pr
+    attributes:
+      label: Are you willing to submit a PR for this feature?
+      options:
+        - "Yes, I can implement this"
+        - "Maybe, with guidance"
+        - "No, I just want to suggest it"
+    validations:
+      required: false
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional Context
+      description: Any other context, screenshots, or examples
+    validations:
+      required: false

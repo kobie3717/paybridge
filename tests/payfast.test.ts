@@ -2,7 +2,7 @@
  * PayFast provider tests
  */
 
-import { describe, it } from 'node:test';
+import { describe, it, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert';
 import crypto from 'node:crypto';
 import { PayFastProvider } from '../src/providers/payfast';
@@ -346,6 +346,183 @@ describe('PayFast Provider', () => {
       assert.deepStrictEqual(capabilities.currencies, ['ZAR']);
       assert.strictEqual(capabilities.country, 'ZA');
       assert.strictEqual(capabilities.avgLatencyMs, 600);
+    });
+  });
+
+  // ==================== Group A: Refund tests ====================
+
+  describe('refund', () => {
+    let originalFetch: typeof globalThis.fetch;
+
+    beforeEach(() => {
+      originalFetch = globalThis.fetch;
+    });
+
+    afterEach(() => {
+      globalThis.fetch = originalFetch;
+    });
+
+    it('should refund with full amount when amount not specified', async () => {
+      let capturedBody: any = null;
+
+      (globalThis as any).fetch = async (url: string, options?: any): Promise<Response> => {
+        capturedBody = options?.body ? JSON.parse(options.body) : null;
+
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            refund_id: 'rf_123',
+            status: 'success',
+          }),
+        } as any as Response;
+      };
+
+      const refund = await provider.refund({
+        paymentId: 'pf_456',
+      });
+
+      assert.strictEqual(refund.status, 'completed');
+      assert.ok(capturedBody);
+      assert.strictEqual(capturedBody.merchant_reference, 'pf_456');
+      assert.strictEqual(capturedBody.amount, undefined); // Full refund
+    });
+
+    it('should include reason when provided', async () => {
+      let capturedBody: any = null;
+
+      (globalThis as any).fetch = async (url: string, options?: any): Promise<Response> => {
+        capturedBody = options?.body ? JSON.parse(options.body) : null;
+
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            refund_id: 'rf_789',
+            status: 'success',
+          }),
+        } as any as Response;
+      };
+
+      await provider.refund({
+        paymentId: 'pf_999',
+        amount: 50.0,
+        reason: 'Customer requested',
+      });
+
+      assert.strictEqual(capturedBody.reason, 'Customer requested');
+      assert.strictEqual(capturedBody.amount, '50.00');
+    });
+
+    // ==================== Group B: Error path tests ====================
+
+    it('should throw on 400 response', async () => {
+      (globalThis as any).fetch = async () => {
+        return {
+          ok: false,
+          status: 400,
+          text: async () => 'Invalid merchant reference',
+        } as any as Response;
+      };
+
+      await assert.rejects(
+        async () => {
+          await provider.refund({ paymentId: 'invalid' });
+        },
+        /PayFast refund failed.*400/
+      );
+    });
+
+    it('should throw on 500 response', async () => {
+      (globalThis as any).fetch = async () => {
+        return {
+          ok: false,
+          status: 500,
+          text: async () => 'Internal server error',
+        } as any as Response;
+      };
+
+      await assert.rejects(
+        async () => {
+          await provider.refund({ paymentId: 'pf_error' });
+        },
+        /PayFast refund failed.*500/
+      );
+    });
+
+    it('should propagate FetchTimeoutError', async () => {
+      const { FetchTimeoutError } = await import('../src/utils/fetch');
+
+      (globalThis as any).fetch = async () => {
+        throw new FetchTimeoutError('https://api.payfast.co.za/refunds/pf_123', 30000);
+      };
+
+      await assert.rejects(
+        async () => {
+          await provider.refund({ paymentId: 'pf_123' });
+        },
+        FetchTimeoutError
+      );
+    });
+
+    it('should throw on 429 rate limit', async () => {
+      (globalThis as any).fetch = async () => {
+        return {
+          ok: false,
+          status: 429,
+          text: async () => 'Rate limit exceeded',
+        } as any as Response;
+      };
+
+      await assert.rejects(
+        async () => {
+          await provider.refund({ paymentId: 'pf_rate' });
+        },
+        /429/
+      );
+    });
+  });
+
+  // ==================== Group E: Currency edge cases ====================
+  // Note: Amount validation (0, negative, NaN, Infinity) is done by the Router, not providers.
+
+  describe('currency validation', () => {
+    it('should throw on unsupported currency USD', async () => {
+      await assert.rejects(
+        async () => {
+          await provider.createPayment({
+            amount: 100.0,
+            currency: 'USD',
+            reference: 'UNSUP',
+            customer: { name: 'Test', email: 'test@example.com' },
+            urls: {
+              success: 'https://example.com/success',
+              cancel: 'https://example.com/cancel',
+              webhook: 'https://example.com/webhook',
+            },
+          });
+        },
+        /Currency USD not supported/
+      );
+    });
+
+    it('should throw on lowercase currency (case-sensitive validation)', async () => {
+      await assert.rejects(
+        async () => {
+          await provider.createPayment({
+            amount: 100.0,
+            currency: 'zar',
+            reference: 'LOWER',
+            customer: { name: 'Test', email: 'test@example.com' },
+            urls: {
+              success: 'https://example.com/success',
+              cancel: 'https://example.com/cancel',
+              webhook: 'https://example.com/webhook',
+            },
+          });
+        },
+        /Currency zar not supported/
+      );
     });
   });
 });

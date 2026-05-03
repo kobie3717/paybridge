@@ -1,0 +1,112 @@
+name: Bug Report
+description: Report a bug or unexpected behavior
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug! Please fill out the form below.
+
+  - type: dropdown
+    id: provider
+    attributes:
+      label: Payment Provider
+      description: Which payment provider are you using?
+      options:
+        - SoftyComp
+        - Yoco
+        - Ozow
+        - PayFast
+        - PayStack
+        - Stripe
+        - Peach Payments
+        - Flutterwave
+        - MoonPay
+        - Yellow Card
+        - Other
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: PayBridge Version
+      description: Run `npm ls paybridge` and paste the version
+      placeholder: "0.2.2"
+    validations:
+      required: true
+
+  - type: input
+    id: node-version
+    attributes:
+      label: Node.js Version
+      description: Run `node --version` and paste the output
+      placeholder: "v20.11.0"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: environment
+    attributes:
+      label: Environment
+      description: Are you using sandbox or live mode?
+      options:
+        - Sandbox
+        - Live
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      description: What did you expect to happen?
+      placeholder: "I expected createPayment() to return a PaymentResult with checkoutUrl"
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual Behavior
+      description: What actually happened?
+      placeholder: "Instead, it threw an error: 'Invalid credentials'"
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Minimal Reproduction Code
+      description: Provide the smallest code sample that reproduces the issue (remove sensitive data!)
+      placeholder: |
+        const pay = new PayBridge({
+          provider: 'softycomp',
+          credentials: { apiKey: 'xxx', secretKey: 'yyy' },
+          sandbox: true
+        });
+        const payment = await pay.createPayment({
+          amount: 299.00,
+          currency: 'ZAR',
+          // ...
+        });
+      render: typescript
+    validations:
+      required: true
+
+  - type: textarea
+    id: stacktrace
+    attributes:
+      label: Stack Trace (if applicable)
+      description: If there's an error, paste the full stack trace
+      render: shell
+    validations:
+      required: false
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional Context
+      description: Any other context about the problem
+    validations:
+      required: false

@@ -331,4 +331,307 @@ describe('StripeProvider', () => {
     assert.strictEqual(caps.avgLatencyMs, 400);
     assert.deepStrictEqual(caps.currencies, ['USD', 'EUR', 'GBP', 'ZAR', 'NGN']);
   });
+
+  // ==================== Group A: Refund tests ====================
+
+  it('should refund with partial amount', async () => {
+    let refundBody = '';
+
+    (globalThis as any).fetch = async (url: string, options?: any): Promise<Response> => {
+      if (url.includes('/checkout/sessions/')) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            id: 'cs_test_partial',
+            payment_intent: 'pi_partial_123',
+            amount_total: 50000,
+            currency: 'usd',
+          }),
+        } as any as Response;
+      } else if (url.includes('/refunds')) {
+        refundBody = options?.body || '';
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            id: 'ref_partial_456',
+            status: 'succeeded',
+            amount: 10000,
+            currency: 'usd',
+            created: Math.floor(Date.now() / 1000),
+          }),
+        } as any as Response;
+      }
+      throw new Error(`Unexpected URL: ${url}`);
+    };
+
+    const refund = await provider.refund({
+      paymentId: 'cs_test_partial',
+      amount: 100.0,
+    });
+
+    assert.strictEqual(refund.amount, 100.0);
+    assert.ok(refundBody.includes('amount=10000')); // cents
+  });
+
+  it('should refund with reason mapping to metadata', async () => {
+    let refundBody = '';
+
+    (globalThis as any).fetch = async (url: string, options?: any): Promise<Response> => {
+      if (url.includes('/checkout/sessions/')) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            id: 'cs_test_reason',
+            payment_intent: 'pi_reason_123',
+            amount_total: 10000,
+            currency: 'usd',
+          }),
+        } as any as Response;
+      } else if (url.includes('/refunds')) {
+        refundBody = options?.body || '';
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            id: 'ref_reason_789',
+            status: 'succeeded',
+            amount: 10000,
+            currency: 'usd',
+            created: Math.floor(Date.now() / 1000),
+          }),
+        } as any as Response;
+      }
+      throw new Error(`Unexpected URL: ${url}`);
+    };
+
+    await provider.refund({
+      paymentId: 'cs_test_reason',
+      reason: 'Customer request',
+    });
+
+    // Stripe maps reason to requested_by_customer for official field + metadata[reason]
+    assert.ok(refundBody.includes('reason=requested_by_customer'), `Expected reason=requested_by_customer in: ${refundBody}`);
+    // The metadata field is nested, so it becomes metadata%5Breason%5D (URL-encoded [reason])
+    assert.ok(refundBody.includes('metadata%5Breason%5D=Customer'), `Expected metadata[reason] in: ${refundBody}`);
+  });
+
+  // ==================== Group B: Error path tests ====================
+
+  it('should throw HttpError on 400 response', async () => {
+    const { HttpError } = await import('../src/utils/fetch');
+
+    (globalThis as any).fetch = async (url: string, options?: any): Promise<Response> => {
+      return {
+        ok: false,
+        status: 400,
+        statusText: 'Bad Request',
+        headers: new Map([['content-type', 'application/json']]) as any,
+        text: async () => JSON.stringify({ error: { message: 'Invalid amount' } }),
+      } as any as Response;
+    };
+
+    await assert.rejects(
+      async () => {
+        await provider.createPayment({
+          amount: 299.0,
+          currency: 'USD',
+          reference: 'ERR-400',
+          customer: { name: 'Test', email: 'test@example.com' },
+          urls: {
+            success: 'https://example.com/success',
+            cancel: 'https://example.com/cancel',
+            webhook: 'https://example.com/webhook',
+          },
+        });
+      },
+      (err: any) => {
+        assert.ok(err instanceof HttpError);
+        assert.strictEqual(err.status, 400);
+        assert.ok(err.message.includes('Invalid amount'));
+        return true;
+      }
+    );
+  });
+
+  it('should throw HttpError on 500 response', async () => {
+    const { HttpError } = await import('../src/utils/fetch');
+
+    (globalThis as any).fetch = async (url: string, options?: any): Promise<Response> => {
+      return {
+        ok: false,
+        status: 500,
+        statusText: 'Internal Server Error',
+        headers: new Map([['content-type', 'text/plain']]) as any,
+        text: async () => 'Server error occurred',
+      } as any as Response;
+    };
+
+    await assert.rejects(
+      async () => {
+        await provider.createPayment({
+          amount: 299.0,
+          currency: 'USD',
+          reference: 'ERR-500',
+          customer: { name: 'Test', email: 'test@example.com' },
+          urls: {
+            success: 'https://example.com/success',
+            cancel: 'https://example.com/cancel',
+            webhook: 'https://example.com/webhook',
+          },
+        });
+      },
+      (err: any) => {
+        assert.ok(err instanceof HttpError);
+        assert.strictEqual(err.status, 500);
+        return true;
+      }
+    );
+  });
+
+  it('should propagate FetchTimeoutError', async () => {
+    const { FetchTimeoutError } = await import('../src/utils/fetch');
+
+    (globalThis as any).fetch = async () => {
+      throw new FetchTimeoutError('https://api.stripe.com/v1/checkout/sessions', 30000);
+    };
+
+    await assert.rejects(
+      async () => {
+        await provider.createPayment({
+          amount: 299.0,
+          currency: 'USD',
+          reference: 'ERR-TIMEOUT',
+          customer: { name: 'Test', email: 'test@example.com' },
+          urls: {
+            success: 'https://example.com/success',
+            cancel: 'https://example.com/cancel',
+            webhook: 'https://example.com/webhook',
+          },
+        });
+      },
+      FetchTimeoutError
+    );
+  });
+
+  it('should throw HttpError on 429 rate limit', async () => {
+    const { HttpError } = await import('../src/utils/fetch');
+
+    (globalThis as any).fetch = async (url: string, options?: any): Promise<Response> => {
+      return {
+        ok: false,
+        status: 429,
+        statusText: 'Too Many Requests',
+        headers: new Map([
+          ['content-type', 'application/json'],
+          ['retry-after', '60'],
+        ]) as any,
+        text: async () => JSON.stringify({ error: { message: 'Rate limit exceeded' } }),
+      } as any as Response;
+    };
+
+    await assert.rejects(
+      async () => {
+        await provider.createPayment({
+          amount: 299.0,
+          currency: 'USD',
+          reference: 'ERR-429',
+          customer: { name: 'Test', email: 'test@example.com' },
+          urls: {
+            success: 'https://example.com/success',
+            cancel: 'https://example.com/cancel',
+            webhook: 'https://example.com/webhook',
+          },
+        });
+      },
+      (err: any) => {
+        assert.ok(err instanceof HttpError);
+        assert.strictEqual(err.status, 429);
+        return true;
+      }
+    );
+  });
+
+  // ==================== Group D: Webhook timestamp boundary tests ====================
+
+  it('should accept webhook at exactly 5min boundary (299 seconds old)', () => {
+    const timestamp = Math.floor(Date.now() / 1000) - 299;
+    const payload = JSON.stringify({ type: 'payment.succeeded' });
+
+    const signedPayload = `${timestamp}.${payload}`;
+    const signature = crypto
+      .createHmac('sha256', 'whsec_test123')
+      .update(signedPayload)
+      .digest('hex');
+
+    const headers = {
+      'stripe-signature': `t=${timestamp},v1=${signature}`,
+    };
+
+    const isValid = provider.verifyWebhook(payload, headers);
+    assert.strictEqual(isValid, true);
+  });
+
+  it('should reject webhook at exactly 5min boundary (301 seconds old)', () => {
+    const timestamp = Math.floor(Date.now() / 1000) - 301;
+    const payload = JSON.stringify({ type: 'payment.succeeded' });
+
+    const signedPayload = `${timestamp}.${payload}`;
+    const signature = crypto
+      .createHmac('sha256', 'whsec_test123')
+      .update(signedPayload)
+      .digest('hex');
+
+    const headers = {
+      'stripe-signature': `t=${timestamp},v1=${signature}`,
+    };
+
+    const isValid = provider.verifyWebhook(payload, headers);
+    assert.strictEqual(isValid, false);
+  });
+
+  // ==================== Group E: Currency edge cases ====================
+  // Note: Amount validation (0, negative, NaN, Infinity) is done by the Router, not providers.
+  // Provider unit tests focus on provider-specific logic.
+
+  it('should throw on unsupported currency XYZ', async () => {
+    await assert.rejects(
+      async () => {
+        await provider.createPayment({
+          amount: 100.0,
+          currency: 'XYZ',
+          reference: 'UNSUP-CUR',
+          customer: { name: 'Test', email: 'test@example.com' },
+          urls: {
+            success: 'https://example.com/success',
+            cancel: 'https://example.com/cancel',
+            webhook: 'https://example.com/webhook',
+          },
+        });
+      },
+      /Currency XYZ not supported/
+    );
+  });
+
+  it('should throw on lowercase currency (case-sensitive validation)', async () => {
+    // Stripe validation is case-sensitive - lowercase 'zar' is rejected
+    await assert.rejects(
+      async () => {
+        await provider.createPayment({
+          amount: 100.0,
+          currency: 'zar',
+          reference: 'LOWER-CASE',
+          customer: { name: 'Test', email: 'test@example.com' },
+          urls: {
+            success: 'https://example.com/success',
+            cancel: 'https://example.com/cancel',
+            webhook: 'https://example.com/webhook',
+          },
+        });
+      },
+      /Currency zar not supported/
+    );
+  });
 });

@@ -3,6 +3,7 @@
 > **One API. Every payment provider. 🌍**
 
 [![npm version](https://img.shields.io/npm/v/paybridge.svg)](https://www.npmjs.com/package/paybridge)
+[![CI](https://github.com/kobie3717/paybridge/actions/workflows/test.yml/badge.svg)](https://github.com/kobie3717/paybridge/actions/workflows/test.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue)](https://www.typescriptlang.org/)
 [![Discord](https://img.shields.io/badge/Discord-Join%20Chat-5865F2?logo=discord&logoColor=white)](https://discord.gg/Y2jCXNGgE)

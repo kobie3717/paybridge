@@ -458,4 +458,207 @@ describe('FlutterwaveProvider', () => {
     assert.strictEqual(caps.avgLatencyMs, 700);
     assert.deepStrictEqual(caps.currencies, ['NGN', 'GHS', 'KES', 'UGX', 'ZAR', 'USD', 'EUR', 'GBP']);
   });
+
+  // ==================== Group A: Refund tests ====================
+
+  it('should refund without amount (full refund)', async () => {
+    let refundBody: any = null;
+
+    (globalThis as any).fetch = async (url: string, options?: any): Promise<Response> => {
+      if (url.includes('verify_by_reference')) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            status: 'success',
+            data: {
+              id: 111222,
+              tx_ref: 'TX-FULL',
+              amount: 500.0,
+            },
+          }),
+        } as any as Response;
+      } else if (url.includes('/refund')) {
+        refundBody = options?.body ? JSON.parse(options.body) : null;
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            status: 'success',
+            data: {
+              id: 555,
+              status: 'completed',
+              amount: 500.0,
+              currency: 'NGN',
+            },
+          }),
+        } as any as Response;
+      }
+      throw new Error(`Unexpected URL: ${url}`);
+    };
+
+    await provider.refund({
+      paymentId: 'TX-FULL',
+    });
+
+    assert.ok(refundBody);
+    assert.strictEqual(refundBody.amount, undefined); // Full refund
+  });
+
+  // Note: Flutterwave refund API does not support reason/comments field
+
+  // ==================== Group B: Error path tests ====================
+
+  it('should throw on 400 response with error message', async () => {
+    (globalThis as any).fetch = async () => {
+      return {
+        ok: false,
+        status: 400,
+        json: async () => ({
+          status: 'error',
+          message: 'Invalid transaction reference',
+        }),
+        text: async () => JSON.stringify({
+          status: 'error',
+          message: 'Invalid transaction reference',
+        }),
+      } as any as Response;
+    };
+
+    await assert.rejects(
+      async () => {
+        await provider.createPayment({
+          amount: 100.0,
+          currency: 'NGN',
+          reference: 'ERR-400',
+          customer: { name: 'Test', email: 'test@example.com' },
+          urls: {
+            success: 'https://example.com/success',
+            cancel: 'https://example.com/cancel',
+            webhook: 'https://example.com/webhook',
+          },
+        });
+      },
+      /Invalid transaction reference/
+    );
+  });
+
+  it('should throw on 500 response', async () => {
+    (globalThis as any).fetch = async () => {
+      return {
+        ok: false,
+        status: 500,
+        json: async () => ({}),
+        text: async () => 'Server error',
+      } as any as Response;
+    };
+
+    await assert.rejects(
+      async () => {
+        await provider.createPayment({
+          amount: 100.0,
+          currency: 'NGN',
+          reference: 'ERR-500',
+          customer: { name: 'Test', email: 'test@example.com' },
+          urls: {
+            success: 'https://example.com/success',
+            cancel: 'https://example.com/cancel',
+            webhook: 'https://example.com/webhook',
+          },
+        });
+      },
+      /500/
+    );
+  });
+
+  it('should propagate FetchTimeoutError', async () => {
+    const { FetchTimeoutError } = await import('../src/utils/fetch');
+
+    (globalThis as any).fetch = async () => {
+      throw new FetchTimeoutError('https://api.flutterwave.com/v3/payments', 30000);
+    };
+
+    await assert.rejects(
+      async () => {
+        await provider.createPayment({
+          amount: 100.0,
+          currency: 'NGN',
+          reference: 'TIMEOUT',
+          customer: { name: 'Test', email: 'test@example.com' },
+          urls: {
+            success: 'https://example.com/success',
+            cancel: 'https://example.com/cancel',
+            webhook: 'https://example.com/webhook',
+          },
+        });
+      },
+      FetchTimeoutError
+    );
+  });
+
+  it('should throw on 429 rate limit', async () => {
+    (globalThis as any).fetch = async () => {
+      return {
+        ok: false,
+        status: 429,
+        json: async () => ({ status: 'error', message: 'Rate limit exceeded' }),
+        text: async () => JSON.stringify({ status: 'error', message: 'Rate limit exceeded' }),
+      } as any as Response;
+    };
+
+    await assert.rejects(
+      async () => {
+        await provider.createPayment({
+          amount: 100.0,
+          currency: 'NGN',
+          reference: 'RATE',
+          customer: { name: 'Test', email: 'test@example.com' },
+          urls: {
+            success: 'https://example.com/success',
+            cancel: 'https://example.com/cancel',
+            webhook: 'https://example.com/webhook',
+          },
+        });
+      },
+      /Rate limit exceeded/
+    );
+  });
+
+  // ==================== Group D: Webhook - NO timestamp validation ====================
+
+  it('should accept webhook without timestamp (no replay protection)', () => {
+    // Flutterwave uses simple verif-hash header matching, NO timestamp
+    const payload = JSON.stringify({ event: 'charge.completed', data: { id: 123 } });
+
+    const headers = {
+      'verif-hash': 'test-webhook-secret-123',
+    };
+
+    const isValid = provider.verifyWebhook(payload, headers);
+    assert.strictEqual(isValid, true);
+
+    // Note: This provider has NO replay protection
+  });
+
+  // ==================== Group E: Currency edge cases ====================
+  // Note: Amount validation (0, negative, NaN, Infinity) is done by the Router, not providers.
+
+  it('should throw on lowercase currency (case-sensitive validation)', async () => {
+    await assert.rejects(
+      async () => {
+        await provider.createPayment({
+          amount: 100.0,
+          currency: 'ngn',
+          reference: 'LOWER',
+          customer: { name: 'Test', email: 'test@example.com' },
+          urls: {
+            success: 'https://example.com/success',
+            cancel: 'https://example.com/cancel',
+            webhook: 'https://example.com/webhook',
+          },
+        });
+      },
+      /Currency ngn not supported/
+    );
+  });
 });

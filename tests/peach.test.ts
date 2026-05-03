@@ -384,4 +384,181 @@ describe('PeachProvider', () => {
       }
     );
   });
+
+  // ==================== Group A: Refund tests ====================
+
+  it('should refund without amount (full refund)', async () => {
+    let capturedBody = '';
+
+    (globalThis as any).fetch = async (url: string, options?: any): Promise<Response> => {
+      capturedBody = options?.body || '';
+
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          result: { code: '000.100.110', description: 'Request successfully processed' },
+          id: 'REFUND-FULL',
+          amount: '299.00',
+          currency: 'ZAR',
+        }),
+      } as any as Response;
+    };
+
+    await provider.refund({
+      paymentId: 'PAY-FULL',
+    });
+
+    // Form-encoded, should NOT contain amount= for full refund
+    assert.ok(!capturedBody.includes('amount='));
+    assert.ok(capturedBody.includes('paymentType=RF'));
+  });
+
+  // Note: Peach refund API does not support reason/merchantMemo field
+
+  // ==================== Group B: Error path tests ====================
+
+  it('should throw HttpError on 400 response', async () => {
+    const { HttpError } = await import('../src/utils/fetch');
+
+    (globalThis as any).fetch = async () => {
+      return {
+        ok: false,
+        status: 400,
+        statusText: 'Bad Request',
+        headers: new Map() as any,
+        text: async () => JSON.stringify({
+          result: { code: '100.100.101', description: 'invalid payment data' },
+        }),
+      } as any as Response;
+    };
+
+    await assert.rejects(
+      async () => {
+        await provider.createPayment({
+          amount: 100.0,
+          currency: 'ZAR',
+          reference: 'ERR-400',
+          customer: { name: 'Test', email: 'test@example.com' },
+          urls: {
+            success: 'https://example.com/success',
+            cancel: 'https://example.com/cancel',
+            webhook: 'https://example.com/webhook',
+          },
+        });
+      },
+      (err: any) => {
+        assert.ok(err instanceof HttpError);
+        assert.strictEqual(err.status, 400);
+        return true;
+      }
+    );
+  });
+
+  it('should throw HttpError on 500 response', async () => {
+    const { HttpError } = await import('../src/utils/fetch');
+
+    (globalThis as any).fetch = async () => {
+      return {
+        ok: false,
+        status: 500,
+        statusText: 'Internal Server Error',
+        headers: new Map() as any,
+        text: async () => 'Internal error',
+      } as any as Response;
+    };
+
+    await assert.rejects(
+      async () => {
+        await provider.refund({ paymentId: 'PAY-500' });
+      },
+      (err: any) => {
+        assert.ok(err instanceof HttpError);
+        assert.strictEqual(err.status, 500);
+        return true;
+      }
+    );
+  });
+
+  it('should propagate FetchTimeoutError', async () => {
+    const { FetchTimeoutError } = await import('../src/utils/fetch');
+
+    (globalThis as any).fetch = async () => {
+      throw new FetchTimeoutError('https://eu-test.oppwa.com/v1/checkouts', 30000);
+    };
+
+    await assert.rejects(
+      async () => {
+        await provider.createPayment({
+          amount: 100.0,
+          currency: 'ZAR',
+          reference: 'TIMEOUT',
+          customer: { name: 'Test', email: 'test@example.com' },
+          urls: {
+            success: 'https://example.com/success',
+            cancel: 'https://example.com/cancel',
+            webhook: 'https://example.com/webhook',
+          },
+        });
+      },
+      FetchTimeoutError
+    );
+  });
+
+  it('should throw HttpError on 429 rate limit', async () => {
+    const { HttpError } = await import('../src/utils/fetch');
+
+    (globalThis as any).fetch = async () => {
+      return {
+        ok: false,
+        status: 429,
+        statusText: 'Too Many Requests',
+        headers: new Map() as any,
+        text: async () => 'Rate limit exceeded',
+      } as any as Response;
+    };
+
+    await assert.rejects(
+      async () => {
+        await provider.createPayment({
+          amount: 100.0,
+          currency: 'ZAR',
+          reference: 'RATE',
+          customer: { name: 'Test', email: 'test@example.com' },
+          urls: {
+            success: 'https://example.com/success',
+            cancel: 'https://example.com/cancel',
+            webhook: 'https://example.com/webhook',
+          },
+        });
+      },
+      (err: any) => {
+        assert.ok(err instanceof HttpError);
+        assert.strictEqual(err.status, 429);
+        return true;
+      }
+    );
+  });
+
+  // ==================== Group E: Currency edge cases ====================
+  // Note: Amount validation (0, negative, NaN, Infinity) is done by the Router, not providers.
+
+  it('should throw on lowercase currency (case-sensitive validation)', async () => {
+    await assert.rejects(
+      async () => {
+        await provider.createPayment({
+          amount: 100.0,
+          currency: 'zar',
+          reference: 'LOWER',
+          customer: { name: 'Test', email: 'test@example.com' },
+          urls: {
+            success: 'https://example.com/success',
+            cancel: 'https://example.com/cancel',
+            webhook: 'https://example.com/webhook',
+          },
+        });
+      },
+      /Currency zar not supported/
+    );
+  });
 });

@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security Vulnerability
+    url: https://github.com/kobie3717/paybridge/security/advisories/new
+    about: Report a security vulnerability privately (do not open a public issue)
+  - name: Discord Community
+    url: https://discord.gg/Y2jCXNGgE
+    about: Ask questions, get support, and chat with the community

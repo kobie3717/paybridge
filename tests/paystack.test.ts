@@ -438,4 +438,233 @@ describe('PayStackProvider', () => {
     assert.strictEqual(caps.avgLatencyMs, 600);
     assert.deepStrictEqual(caps.currencies, ['NGN', 'GHS', 'ZAR', 'USD', 'KES']);
   });
+
+  // ==================== Group A: Refund tests ====================
+
+  it('should refund without amount (full refund)', async () => {
+    let capturedBody: any = null;
+
+    (globalThis as any).fetch = async (url: string, options?: any): Promise<Response> => {
+      capturedBody = options?.body ? JSON.parse(options.body) : null;
+
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          status: true,
+          data: {
+            id: 99999,
+            reference: 'ref_full_refund',
+            status: 'processed',
+            amount: 50000,
+            currency: 'NGN',
+          },
+        }),
+      } as any as Response;
+    };
+
+    await provider.refund({
+      paymentId: 'ref_orig_123',
+    });
+
+    assert.ok(capturedBody);
+    assert.strictEqual(capturedBody.transaction, 'ref_orig_123');
+    assert.strictEqual(capturedBody.amount, undefined); // Full refund, no amount
+  });
+
+  it('should include merchant_note when reason provided', async () => {
+    let capturedBody: any = null;
+
+    (globalThis as any).fetch = async (url: string, options?: any): Promise<Response> => {
+      capturedBody = options?.body ? JSON.parse(options.body) : null;
+
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          status: true,
+          data: {
+            id: 12345,
+            reference: 'ref_reason',
+            status: 'processed',
+            amount: 10000,
+            currency: 'NGN',
+          },
+        }),
+      } as any as Response;
+    };
+
+    await provider.refund({
+      paymentId: 'ref_orig_456',
+      amount: 100.0,
+      reason: 'Defective product',
+    });
+
+    assert.strictEqual(capturedBody.merchant_note, 'Defective product');
+  });
+
+  // ==================== Group B: Error path tests ====================
+
+  it('should throw on 400 with error message from body', async () => {
+    (globalThis as any).fetch = async (url: string, options?: any): Promise<Response> => {
+      return {
+        ok: false,
+        status: 400,
+        json: async () => ({
+          status: false,
+          message: 'Invalid email format',
+        }),
+        text: async () => JSON.stringify({
+          status: false,
+          message: 'Invalid email format',
+        }),
+      } as any as Response;
+    };
+
+    await assert.rejects(
+      async () => {
+        await provider.createPayment({
+          amount: 100.0,
+          currency: 'NGN',
+          reference: 'ERR-400',
+          customer: { name: 'Test', email: 'invalid' },
+          urls: {
+            success: 'https://example.com/success',
+            cancel: 'https://example.com/cancel',
+            webhook: 'https://example.com/webhook',
+          },
+        });
+      },
+      (err: any) => {
+        // PayStack throws plain Error with message from response
+        assert.ok(err.message.includes('Invalid email'));
+        return true;
+      }
+    );
+  });
+
+  it('should throw on 500 response', async () => {
+    (globalThis as any).fetch = async () => {
+      return {
+        ok: false,
+        status: 500,
+        json: async () => ({}),
+        text: async () => 'Internal Server Error',
+      } as any as Response;
+    };
+
+    await assert.rejects(
+      async () => {
+        await provider.createPayment({
+          amount: 100.0,
+          currency: 'NGN',
+          reference: 'ERR-500',
+          customer: { name: 'Test', email: 'test@example.com' },
+          urls: {
+            success: 'https://example.com/success',
+            cancel: 'https://example.com/cancel',
+            webhook: 'https://example.com/webhook',
+          },
+        });
+      },
+      /500/
+    );
+  });
+
+  it('should propagate FetchTimeoutError', async () => {
+    const { FetchTimeoutError } = await import('../src/utils/fetch');
+
+    (globalThis as any).fetch = async () => {
+      throw new FetchTimeoutError('https://api.paystack.co/transaction/initialize', 30000);
+    };
+
+    await assert.rejects(
+      async () => {
+        await provider.createPayment({
+          amount: 100.0,
+          currency: 'NGN',
+          reference: 'TIMEOUT',
+          customer: { name: 'Test', email: 'test@example.com' },
+          urls: {
+            success: 'https://example.com/success',
+            cancel: 'https://example.com/cancel',
+            webhook: 'https://example.com/webhook',
+          },
+        });
+      },
+      FetchTimeoutError
+    );
+  });
+
+  it('should throw on 429 rate limit', async () => {
+    (globalThis as any).fetch = async () => {
+      return {
+        ok: false,
+        status: 429,
+        json: async () => ({ status: false, message: 'Rate limit exceeded' }),
+        text: async () => JSON.stringify({ status: false, message: 'Rate limit exceeded' }),
+      } as any as Response;
+    };
+
+    await assert.rejects(
+      async () => {
+        await provider.createPayment({
+          amount: 100.0,
+          currency: 'NGN',
+          reference: 'RATE-LIMIT',
+          customer: { name: 'Test', email: 'test@example.com' },
+          urls: {
+            success: 'https://example.com/success',
+            cancel: 'https://example.com/cancel',
+            webhook: 'https://example.com/webhook',
+          },
+        });
+      },
+      /Rate limit exceeded/
+    );
+  });
+
+  // ==================== Group D: Webhook - NO timestamp validation ====================
+
+  it('should accept webhook without timestamp validation (no replay protection)', () => {
+    // PayStack uses HMAC-SHA512 on body only, NO timestamp check
+    const payload = JSON.stringify({ event: 'charge.success', data: { amount: 10000 } });
+
+    const signature = crypto
+      .createHmac('sha512', 'sk_test_123456789')
+      .update(payload)
+      .digest('hex');
+
+    const headers = {
+      'x-paystack-signature': signature,
+    };
+
+    const isValid = provider.verifyWebhook(payload, headers);
+    assert.strictEqual(isValid, true);
+
+    // Verify that even a very old webhook would be accepted (no timestamp in signature)
+    // This is a documented limitation of PayStack's webhook design
+  });
+
+  // ==================== Group E: Currency edge cases ====================
+  // Note: Amount validation (0, negative, NaN, Infinity) is done by the Router, not providers.
+
+  it('should throw on lowercase currency (case-sensitive validation)', async () => {
+    await assert.rejects(
+      async () => {
+        await provider.createPayment({
+          amount: 100.0,
+          currency: 'ngn',
+          reference: 'LOWER',
+          customer: { name: 'Test', email: 'test@example.com' },
+          urls: {
+            success: 'https://example.com/success',
+            cancel: 'https://example.com/cancel',
+            webhook: 'https://example.com/webhook',
+          },
+        });
+      },
+      /Currency ngn not supported/
+    );
+  });
 });

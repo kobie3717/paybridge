@@ -2,7 +2,7 @@
  * Ozow provider tests
  */
 
-import { describe, it, mock } from 'node:test';
+import { describe, it, mock, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert';
 import crypto from 'node:crypto';
 import { OzowProvider } from '../src/providers/ozow';
@@ -521,6 +521,171 @@ describe('Ozow Provider', () => {
       assert.deepStrictEqual(capabilities.currencies, ['ZAR']);
       assert.strictEqual(capabilities.country, 'ZA');
       assert.strictEqual(capabilities.avgLatencyMs, 800);
+    });
+  });
+
+  // ==================== Group A: Refund - NOT SUPPORTED ====================
+
+  describe('refund - unsupported', () => {
+    it('should throw documented error for full refund', async () => {
+      await assert.rejects(
+        async () => {
+          await provider.refund({ paymentId: 'TEST-001' });
+        },
+        {
+          message: 'Ozow refunds must be processed manually via merchant.ozow.com — no API support.',
+        }
+      );
+    });
+
+    it('should throw documented error for partial refund', async () => {
+      await assert.rejects(
+        async () => {
+          await provider.refund({ paymentId: 'TEST-002', amount: 50.0 });
+        },
+        {
+          message: 'Ozow refunds must be processed manually via merchant.ozow.com — no API support.',
+        }
+      );
+    });
+
+    it('should throw documented error even with reason', async () => {
+      await assert.rejects(
+        async () => {
+          await provider.refund({ paymentId: 'TEST-003', reason: 'Customer request' });
+        },
+        {
+          message: 'Ozow refunds must be processed manually via merchant.ozow.com — no API support.',
+        }
+      );
+    });
+  });
+
+  // ==================== Group B: Error path tests (getPayment) ====================
+
+  describe('error handling', () => {
+    let originalFetch: typeof globalThis.fetch;
+
+    beforeEach(() => {
+      originalFetch = globalThis.fetch;
+    });
+
+    afterEach(() => {
+      globalThis.fetch = originalFetch;
+    });
+
+    it('should throw HttpError on 400 from getPayment', async () => {
+      const { HttpError } = await import('../src/utils/fetch');
+
+      (globalThis as any).fetch = async () => {
+        return {
+          ok: false,
+          status: 400,
+          statusText: 'Bad Request',
+          headers: new Map() as any,
+          text: async () => 'Invalid transaction reference',
+        } as any as Response;
+      };
+
+      await assert.rejects(
+        async () => {
+          await provider.getPayment('INVALID');
+        },
+        (err: any) => {
+          assert.ok(err instanceof HttpError);
+          assert.strictEqual(err.status, 400);
+          return true;
+        }
+      );
+    });
+
+    it('should throw HttpError on 500 from getPayment', async () => {
+      const { HttpError } = await import('../src/utils/fetch');
+
+      (globalThis as any).fetch = async () => {
+        return {
+          ok: false,
+          status: 500,
+          statusText: 'Internal Server Error',
+          headers: new Map() as any,
+          text: async () => 'Server error',
+        } as any as Response;
+      };
+
+      await assert.rejects(
+        async () => {
+          await provider.getPayment('ERR-500');
+        },
+        (err: any) => {
+          assert.ok(err instanceof HttpError);
+          assert.strictEqual(err.status, 500);
+          return true;
+        }
+      );
+    });
+
+    it('should propagate FetchTimeoutError', async () => {
+      const { FetchTimeoutError } = await import('../src/utils/fetch');
+
+      (globalThis as any).fetch = async () => {
+        throw new FetchTimeoutError('https://stagingapi.ozow.com/GetTransaction', 30000);
+      };
+
+      await assert.rejects(
+        async () => {
+          await provider.getPayment('TIMEOUT');
+        },
+        FetchTimeoutError
+      );
+    });
+
+    it('should throw HttpError on 429 rate limit', async () => {
+      const { HttpError } = await import('../src/utils/fetch');
+
+      (globalThis as any).fetch = async () => {
+        return {
+          ok: false,
+          status: 429,
+          statusText: 'Too Many Requests',
+          headers: new Map() as any,
+          text: async () => 'Rate limit exceeded',
+        } as any as Response;
+      };
+
+      await assert.rejects(
+        async () => {
+          await provider.getPayment('RATE');
+        },
+        (err: any) => {
+          assert.ok(err instanceof HttpError);
+          assert.strictEqual(err.status, 429);
+          return true;
+        }
+      );
+    });
+  });
+
+  // ==================== Group E: Currency edge cases ====================
+  // Note: Amount validation (0, negative, NaN, Infinity) is done by the Router, not providers.
+
+  describe('currency validation', () => {
+    it('should throw on lowercase currency (case-sensitive validation)', async () => {
+      await assert.rejects(
+        async () => {
+          await provider.createPayment({
+            amount: 100.0,
+            currency: 'zar',
+            reference: 'LOWER',
+            customer: { name: 'Test', email: 'test@example.com' },
+            urls: {
+              success: 'https://example.com/success',
+              cancel: 'https://example.com/cancel',
+              webhook: 'https://example.com/webhook',
+            },
+          });
+        },
+        /Currency zar not supported/
+      );
     });
   });
 });

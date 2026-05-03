@@ -12,6 +12,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Yellow Card real spec verification (when partner docs available)
 - CI/CD pipeline with GitHub Actions
 
+## [0.2.3] - 2026-05-03
+
+### Added
+- **GitHub Actions CI** — `.github/workflows/test.yml` runs typecheck + 227 tests on Node 18, 20, 22 against every push to `master` and every PR.
+- **Manual publish workflow** — `.github/workflows/publish.yml` publishes to npm on tag push (`v*.*.*`) or manual dispatch. Requires `NPM_TOKEN` repo secret.
+- **`SECURITY.md`** — vulnerability disclosure policy, supported versions, 90-day responsible disclosure window.
+- **`CONTRIBUTING.md`** — local setup, e2e harness instructions, provider-implementation checklist (extend base, getCapabilities, fetch-mock tests, factory wiring, README + CHANGELOG entries), code style rules.
+- **Issue + PR templates** — `bug_report.yml` (provider dropdown, version, sandbox/live, reproduction), `feature_request.yml`, `config.yml` (links to security advisories + Discord), `PULL_REQUEST_TEMPLATE.md`.
+- **`prepack` script** — runs `clean && build` so `npm pack` produces the same lean tarball as `npm publish`.
+
+### Tests
+- **+56 unit tests** (171 → 227, +33% coverage). All providers gained:
+  - Refund happy paths (full, partial, with-reason) for Stripe / Yoco / PayStack / PayFast / Flutterwave / Peach.
+  - "Refund unsupported by spec" coverage for Ozow (3 tests confirming clean throw).
+  - 4xx / 5xx HTTP error path tests for all 8 fiat + 2 crypto providers.
+  - `FetchTimeoutError` propagation tests.
+  - HTTP 429 surfacing as `HttpError`.
+  - Webhook replay-window boundary edges (Stripe 299s pass / 301s reject, Yoco Svix 299s/301s).
+  - Documented "no replay protection" tests for PayStack + Flutterwave (provider spec limitation).
+  - `Idempotency-Key` uniqueness tests for Yoco.
+  - Currency validation edge cases (unsupported, lowercase).
+
 ## [0.2.2] - 2026-05-03
 
 ### Added

@@ -432,4 +432,271 @@ describe('YocoProvider', () => {
     assert.strictEqual(caps.avgLatencyMs, 500);
     assert.deepStrictEqual(caps.currencies, ['ZAR']);
   });
+
+  // ==================== Group A: Refund tests ====================
+
+  it('should refund with reason in metadata', async () => {
+    let capturedBody = '';
+
+    (globalThis as any).fetch = async (url: string, options?: any): Promise<Response> => {
+      capturedBody = options?.body || '';
+
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          id: 'rf_reason',
+          status: 'completed',
+          amount: 10000,
+          currency: 'ZAR',
+        }),
+      } as any as Response;
+    };
+
+    await provider.refund({
+      paymentId: 'ch_test',
+      amount: 100.0,
+      reason: 'Duplicate charge',
+    });
+
+    const body = JSON.parse(capturedBody);
+    assert.strictEqual(body.metadata.reason, 'Duplicate charge');
+  });
+
+  // ==================== Group B: Error path tests ====================
+
+  it('should throw HttpError on 400 response', async () => {
+    const { HttpError } = await import('../src/utils/fetch');
+
+    (globalThis as any).fetch = async (url: string, options?: any): Promise<Response> => {
+      return {
+        ok: false,
+        status: 400,
+        statusText: 'Bad Request',
+        headers: new Map([['content-type', 'application/json']]) as any,
+        text: async () => JSON.stringify({ message: 'Invalid checkout amount' }),
+      } as any as Response;
+    };
+
+    await assert.rejects(
+      async () => {
+        await provider.createPayment({
+          amount: 299.0,
+          currency: 'ZAR',
+          reference: 'ERR-400',
+          customer: { name: 'Test', email: 'test@example.com' },
+          urls: {
+            success: 'https://example.com/success',
+            cancel: 'https://example.com/cancel',
+            webhook: 'https://example.com/webhook',
+          },
+        });
+      },
+      (err: any) => {
+        assert.ok(err instanceof HttpError);
+        assert.strictEqual(err.status, 400);
+        return true;
+      }
+    );
+  });
+
+  it('should throw HttpError on 500 response', async () => {
+    const { HttpError } = await import('../src/utils/fetch');
+
+    (globalThis as any).fetch = async () => {
+      return {
+        ok: false,
+        status: 500,
+        statusText: 'Internal Server Error',
+        headers: new Map() as any,
+        text: async () => 'Internal error',
+      } as any as Response;
+    };
+
+    await assert.rejects(
+      async () => {
+        await provider.refund({ paymentId: 'ch_error' });
+      },
+      (err: any) => {
+        assert.ok(err instanceof HttpError);
+        assert.strictEqual(err.status, 500);
+        return true;
+      }
+    );
+  });
+
+  it('should propagate FetchTimeoutError', async () => {
+    const { FetchTimeoutError } = await import('../src/utils/fetch');
+
+    (globalThis as any).fetch = async () => {
+      throw new FetchTimeoutError('https://payments.yoco.com/api/v1/checkouts', 30000);
+    };
+
+    await assert.rejects(
+      async () => {
+        await provider.createPayment({
+          amount: 299.0,
+          currency: 'ZAR',
+          reference: 'TIMEOUT',
+          customer: { name: 'Test', email: 'test@example.com' },
+          urls: {
+            success: 'https://example.com/success',
+            cancel: 'https://example.com/cancel',
+            webhook: 'https://example.com/webhook',
+          },
+        });
+      },
+      FetchTimeoutError
+    );
+  });
+
+  it('should throw HttpError on 429 rate limit', async () => {
+    const { HttpError } = await import('../src/utils/fetch');
+
+    (globalThis as any).fetch = async () => {
+      return {
+        ok: false,
+        status: 429,
+        statusText: 'Too Many Requests',
+        headers: new Map([['retry-after', '30']]) as any,
+        text: async () => 'Rate limit exceeded',
+      } as any as Response;
+    };
+
+    await assert.rejects(
+      async () => {
+        await provider.createPayment({
+          amount: 100.0,
+          currency: 'ZAR',
+          reference: 'RATE-LIMIT',
+          customer: { name: 'Test', email: 'test@example.com' },
+          urls: {
+            success: 'https://example.com/success',
+            cancel: 'https://example.com/cancel',
+            webhook: 'https://example.com/webhook',
+          },
+        });
+      },
+      (err: any) => {
+        assert.ok(err instanceof HttpError);
+        assert.strictEqual(err.status, 429);
+        return true;
+      }
+    );
+  });
+
+  // ==================== Group C: Idempotency tests ====================
+
+  it('should generate different Idempotency-Keys for separate calls', async () => {
+    const capturedKeys: string[] = [];
+
+    (globalThis as any).fetch = async (url: string, options?: any): Promise<Response> => {
+      const headers = options?.headers || {};
+      capturedKeys.push(headers['Idempotency-Key']);
+
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          id: `ch_${Date.now()}`,
+          redirectUrl: 'https://pay.yoco.com/i/test',
+          amount: 10000,
+          currency: 'ZAR',
+          status: 'created',
+        }),
+      } as any as Response;
+    };
+
+    await provider.createPayment({
+      amount: 100.0,
+      currency: 'ZAR',
+      reference: 'IDEMPOTENT-1',
+      customer: { name: 'Test', email: 'test@example.com' },
+      urls: {
+        success: 'https://example.com/success',
+        cancel: 'https://example.com/cancel',
+        webhook: 'https://example.com/webhook',
+      },
+    });
+
+    await provider.createPayment({
+      amount: 100.0,
+      currency: 'ZAR',
+      reference: 'IDEMPOTENT-2',
+      customer: { name: 'Test', email: 'test@example.com' },
+      urls: {
+        success: 'https://example.com/success',
+        cancel: 'https://example.com/cancel',
+        webhook: 'https://example.com/webhook',
+      },
+    });
+
+    assert.strictEqual(capturedKeys.length, 2);
+    assert.notStrictEqual(capturedKeys[0], capturedKeys[1]);
+    assert.ok(capturedKeys[0].length > 0);
+    assert.ok(capturedKeys[1].length > 0);
+  });
+
+  // ==================== Group D: Webhook timestamp boundary tests ====================
+
+  it('should accept webhook at exactly 5min boundary (299 seconds old)', () => {
+    const webhookId = 'msg_boundary_ok';
+    const timestamp = Math.floor(Date.now() / 1000) - 299;
+    const payload = JSON.stringify({ type: 'payment.succeeded' });
+
+    const signedPayload = `${webhookId}.${timestamp}.${payload}`;
+    const secret = Buffer.from('test123base64encoded', 'base64');
+    const signature = crypto.createHmac('sha256', secret).update(signedPayload).digest('base64');
+
+    const headers = {
+      'webhook-id': webhookId,
+      'webhook-timestamp': String(timestamp),
+      'webhook-signature': `v1,${signature}`,
+    };
+
+    const isValid = provider.verifyWebhook(payload, headers);
+    assert.strictEqual(isValid, true);
+  });
+
+  it('should reject webhook at exactly 5min boundary (301 seconds old)', () => {
+    const webhookId = 'msg_boundary_fail';
+    const timestamp = Math.floor(Date.now() / 1000) - 301;
+    const payload = JSON.stringify({ type: 'payment.succeeded' });
+
+    const signedPayload = `${webhookId}.${timestamp}.${payload}`;
+    const secret = Buffer.from('test123base64encoded', 'base64');
+    const signature = crypto.createHmac('sha256', secret).update(signedPayload).digest('base64');
+
+    const headers = {
+      'webhook-id': webhookId,
+      'webhook-timestamp': String(timestamp),
+      'webhook-signature': `v1,${signature}`,
+    };
+
+    const isValid = provider.verifyWebhook(payload, headers);
+    assert.strictEqual(isValid, false);
+  });
+
+  // ==================== Group E: Currency edge cases ====================
+  // Note: Amount validation (0, negative, NaN, Infinity) is done by the Router, not providers.
+
+  it('should throw on lowercase currency (case-sensitive validation)', async () => {
+    // Yoco validation is case-sensitive - lowercase 'zar' is rejected
+    await assert.rejects(
+      async () => {
+        await provider.createPayment({
+          amount: 100.0,
+          currency: 'zar',
+          reference: 'LOWER',
+          customer: { name: 'Test', email: 'test@example.com' },
+          urls: {
+            success: 'https://example.com/success',
+            cancel: 'https://example.com/cancel',
+            webhook: 'https://example.com/webhook',
+          },
+        });
+      },
+      /Currency zar not supported/
+    );
+  });
 });
