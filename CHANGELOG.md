@@ -10,6 +10,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Planned
 - Yellow Card real spec verification (when partner docs available)
 
+## [0.9.0] - 2026-05-04
+
+### Added
+- **Documentation site** — VitePress-powered docs at `docs-site/`. Pages for each of the 14 fiat + 4 crypto providers, routing strategies, webhook signature/idempotency, observability (events/ledger/tracing), CLI reference, examples, errors, types. Local-search built in.
+- **`.github/workflows/docs-deploy.yml`** — automatic GitHub Pages deployment on push to `master` when `docs-site/` changes. Live at https://kobie3717.github.io/paybridge/ once Pages is enabled with "GitHub Actions" source.
+- README banner pointing to the docs site.
+
 ## [0.8.0] - 2026-05-04
 
 ### Added

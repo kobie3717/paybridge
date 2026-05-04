@@ -8,6 +8,8 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue)](https://www.typescriptlang.org/)
 [![Discord](https://img.shields.io/badge/Discord-Join%20Chat-5865F2?logo=discord&logoColor=white)](https://discord.gg/Y2jCXNGgE)
 
+📚 **[Documentation](https://kobie3717.github.io/paybridge/)** — full guides, provider reference, CLI docs, migration guides, examples.
+
 Unified payment SDK for Node.js that works with multiple payment providers through a single, consistent API. Focus on South African providers first, with support for international gateways.
 
 **WaSP is to WhatsApp what PayBridge is to payments** — one SDK, multiple backends, zero friction.

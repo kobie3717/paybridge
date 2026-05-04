@@ -14,6 +14,12 @@ This checklist is for the maintainer (Kobie) and covers infrastructure tasks tha
   - Scope: Read + write packages
   - The `.github/workflows/publish.yml` workflow needs this to publish on tag push (`v*.*.*`)
 
+- [ ] **Enable GitHub Pages**  
+  Path: `Settings → Pages → Build and deployment`  
+  - Source: `GitHub Actions`
+  - The `.github/workflows/docs-deploy.yml` workflow will deploy docs automatically
+  - Docs will be live at https://kobie3717.github.io/paybridge/
+
 - [ ] **Enable Discussions** (recommended)  
   Path: `Settings → General → Features → Discussions`  
   - Useful for community Q&A, pinned announcements, feature discussions
