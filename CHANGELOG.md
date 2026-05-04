@@ -10,6 +10,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Planned
 - Yellow Card real spec verification (when partner docs available)
 
+## [0.5.0] - 2026-05-04
+
+### Added
+- **Adyen provider** (production) — Checkout v71 sessions API, 8 currencies (ZAR/EUR/USD/GBP/AUD/BRL/INR/NGN), refunds via /payments/{id}/refunds, HMAC-SHA256 webhook verification on NotificationRequestItem batch envelope. Subscriptions throw cleanly (Adyen requires recurring tokenization not yet supported).
+- **Mercado Pago provider** (production) — Checkout Preferences API, 7 currencies (BRL/ARS/USD/MXN/COP/CLP/ZAR), preapproval-based subscriptions (weekly/monthly/yearly mapped to frequency_type), refunds, HMAC-SHA256 v1 webhook signature with 300s replay window.
+- **Razorpay provider** (production) — Orders + Plans API, 7 currencies (INR/USD/EUR/GBP/SGD/AED/AUD), HTTP Basic auth, two-step subscription flow (plan + subscription), refunds via payment_id (auto-resolves order_id), HMAC-SHA256 webhook verification.
+
+### Changed
+- Added `'adyen' | 'mercadopago' | 'razorpay'` to `Provider` union (additive, not breaking).
+
 ## [0.4.0] - 2026-05-04
 
 ### Added

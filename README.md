@@ -194,6 +194,9 @@ app.post('/webhook', express.raw({ type: 'application/json' }), (req, res) => {
 | **Stripe** | ✅ | ✅ | ✅ | ✅ | **Production** |
 | **Peach Payments** | ✅ | ⛔ | ✅ | ✅ | **Production** |
 | **Flutterwave** | ✅ | ✅ | ✅ | ✅ | **Production** |
+| **Adyen** | ✅ | ⛔ | ✅ | ✅ | **Production** |
+| **Mercado Pago** | ✅ | ✅ | ✅ | ✅ | **Production** |
+| **Razorpay** | ✅ | ✅ | ✅ | ✅ | **Production** |
 
 ### Crypto on/off-ramp providers
 
@@ -207,7 +210,7 @@ app.post('/webhook', express.raw({ type: 'application/json' }), (req, res) => {
 **Notes:**
 - `⛔` marks features the underlying provider's API doesn't support — those methods throw a clear error explaining the limitation. Use a different provider for that capability or use `PayBridgeRouter` to route accordingly.
 - **Yellow Card** is gated behind `@experimental` until partner API documentation is verified — it logs a warning on instantiation. Do not use in production without partner-confirmed spec.
-- **Sandbox testing.** PayFast / PayStack / Stripe / Peach / Flutterwave are wired and unit-tested, but have not yet been validated against live sandbox credentials. To validate against real sandboxes, set the relevant `*_API_KEY` env vars and run `npm run test:e2e:sandbox`.
+- **Sandbox testing.** PayFast / PayStack / Stripe / Peach / Flutterwave / Adyen / Mercado Pago / Razorpay are wired and unit-tested, but have not yet been validated against live sandbox credentials. To validate against real sandboxes, set the relevant `*_API_KEY` env vars and run `npm run test:e2e:sandbox`.
 
 ## Provider Configuration
 
@@ -257,6 +260,58 @@ const pay = new PayBridge({
 ```
 
 **Docs:** [Ozow Hub](https://hub.ozow.com)
+
+### Adyen
+
+```typescript
+const pay = new PayBridge({
+  provider: 'adyen',
+  credentials: {
+    apiKey: 'your_api_key',
+    merchantAccount: 'YourMerchantAccount',
+    liveUrlPrefix: 'abc123' // Only for live mode
+  },
+  sandbox: true,
+  webhookSecret: 'your_hmac_key_hex'
+});
+```
+
+**Docs:** [Adyen API Explorer](https://docs.adyen.com/api-explorer/)
+
+**Note:** Adyen subscriptions require recurring tokenization flow (not yet supported). Use Stripe or PayFast for subscriptions.
+
+### Mercado Pago
+
+```typescript
+const pay = new PayBridge({
+  provider: 'mercadopago',
+  credentials: {
+    apiKey: 'TEST-...' // Or APP_USR-... for live
+  },
+  sandbox: true,
+  webhookSecret: 'your_webhook_secret'
+});
+```
+
+**Docs:** [Mercado Pago Developers](https://www.mercadopago.com/developers/en/reference)
+
+### Razorpay
+
+```typescript
+const pay = new PayBridge({
+  provider: 'razorpay',
+  credentials: {
+    apiKey: 'rzp_test_...', // key_id
+    secretKey: 'your_key_secret'
+  },
+  sandbox: true,
+  webhookSecret: 'your_webhook_secret'
+});
+```
+
+**Docs:** [Razorpay API Reference](https://razorpay.com/docs/api)
+
+**Note:** Razorpay webhooks do not include timestamp-based replay protection.
 
 ## Switch Providers in 1 Line
 

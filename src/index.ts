@@ -14,6 +14,9 @@ import { StripeProvider } from './providers/stripe';
 import { PayFastProvider } from './providers/payfast';
 import { PayStackProvider } from './providers/paystack';
 import { FlutterwaveProvider } from './providers/flutterwave';
+import { AdyenProvider } from './providers/adyen';
+import { MercadoPagoProvider } from './providers/mercadopago';
+import { RazorpayProvider } from './providers/razorpay';
 
 import {
   PayBridgeConfig,
@@ -142,6 +145,40 @@ export class PayBridge {
           sandbox,
           webhookSecret,
         });
+
+      case 'adyen':
+        if (!credentials.apiKey || !credentials.merchantAccount) {
+          throw new Error('Adyen requires apiKey and merchantAccount');
+        }
+        return new AdyenProvider({
+          apiKey: credentials.apiKey,
+          merchantAccount: credentials.merchantAccount,
+          liveUrlPrefix: credentials.liveUrlPrefix,
+          sandbox,
+          webhookSecret,
+        });
+
+      case 'mercadopago':
+        if (!credentials.apiKey) {
+          throw new Error('Mercado Pago requires apiKey (access token TEST-* or APP_USR-*)');
+        }
+        return new MercadoPagoProvider({
+          accessToken: credentials.apiKey,
+          sandbox,
+          webhookSecret,
+        });
+
+      case 'razorpay':
+        if (!credentials.apiKey || !credentials.secretKey) {
+          throw new Error('Razorpay requires apiKey (key_id rzp_test_* or rzp_live_*) and secretKey (key_secret)');
+        }
+        return new RazorpayProvider({
+          keyId: credentials.apiKey,
+          keySecret: credentials.secretKey,
+          sandbox,
+          webhookSecret,
+        });
+
       default:
         throw new Error(`Unknown provider: ${provider}`);
     }
