@@ -12,6 +12,7 @@ tests/**/*.d.ts
 .env
 .env.local
 .env.*.local
+.env.sandbox
 
 # IDE
 .vscode/
