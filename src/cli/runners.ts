@@ -116,14 +116,24 @@ export const runners: ProviderRunner[] = [
         credentials: { apiKey: process.env.PAYSTACK_API_KEY! },
         sandbox: true,
       });
-      const payment = await pay.createPayment({
-        amount: 1.0,
-        currency: 'NGN',
-        reference: `cli-test-${timestamp}`,
-        customer: testCustomer,
-        urls: testUrls,
-      });
-      return { id: payment.id, checkoutUrl: payment.checkoutUrl, status: payment.status };
+      const currencies = (process.env.PAYSTACK_TEST_CURRENCY || 'NGN,ZAR,GHS,KES').split(',');
+      let lastErr: Error | undefined;
+      for (const currency of currencies) {
+        try {
+          const payment = await pay.createPayment({
+            amount: 100.0,
+            currency: currency.trim() as any,
+            reference: `cli-test-${timestamp}-${currency.trim()}`,
+            customer: testCustomer,
+            urls: testUrls,
+          });
+          return { id: payment.id, checkoutUrl: payment.checkoutUrl, status: payment.status };
+        } catch (e: any) {
+          lastErr = e;
+          if (!/currency not supported/i.test(e.message)) throw e;
+        }
+      }
+      throw lastErr ?? new Error('No currency accepted by PayStack merchant');
     },
   },
   {
