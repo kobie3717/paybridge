@@ -29,6 +29,10 @@ Thank you for considering contributing to PayBridge! This document outlines the 
 
 5. **Run e2e sandbox tests** (optional)
    ```bash
+   # Validate all providers against real sandboxes (requires credentials)
+   npm run test:e2e:sandbox
+   
+   # Individual provider harnesses
    npm run test:e2e:moonpay
    npm run test:e2e:yellowcard
    ```

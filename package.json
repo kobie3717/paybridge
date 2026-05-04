@@ -1,6 +1,6 @@
 {
   "name": "paybridge",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "One API for fiat + crypto payments. Multi-provider routing, automatic failover, MoonPay on/off-ramp. SA-first, global-ready.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -11,7 +11,8 @@
     "prepublishOnly": "npm run clean && npm run build",
     "test": "tsc && tsc --project tsconfig.test.json && node --test 'dist-test/**/*.test.js'",
     "test:e2e:moonpay": "tsx tests/e2e/moonpay-sandbox.ts",
-    "test:e2e:yellowcard": "tsx tests/e2e/yellowcard-sandbox.ts"
+    "test:e2e:yellowcard": "tsx tests/e2e/yellowcard-sandbox.ts",
+    "test:e2e:sandbox": "tsx tests/e2e/sandbox-validate.ts"
   },
   "keywords": [
     "payments",
@@ -49,6 +50,7 @@
   },
   "devDependencies": {
     "@types/node": "^18.19.130",
+    "tsx": "^4.19.2",
     "typescript": "^5.9.3"
   }
 }

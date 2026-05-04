@@ -10,6 +10,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Planned
 - Yellow Card real spec verification (when partner docs available)
 
+## [0.3.1] - 2026-05-03
+
+### Added
+- **`STABILITY.md`** — public-API stability policy + 1.0.0 release gates. Lists what 1.0 will lock and what stays internal.
+- **`SETUP.md`** — maintainer one-time setup checklist (NPM_TOKEN secret, branch protection, npm 2FA, etc.).
+- **`tests/e2e/sandbox-validate.ts`** — runnable harness that exercises every fiat provider's `createPayment` against its real sandbox if env vars are set, else skips. R1/$1 amounts only, no real charges. Run with `npm run test:e2e:sandbox`.
+- **`docs/announcements/v0.3.0.md`** — Twitter / LinkedIn / Discord / HN drafts.
+- `tsx` added to devDependencies (was missing despite scripts referencing it).
+
+### Changed
+- **`SECURITY.md`** — replaced placeholder email with GitHub Security Advisories link. Added Scope (in/out) section. No email maintenance burden.
+- README sandbox-testing note now references `npm run test:e2e:sandbox`.
+
 ## [0.3.0] - 2026-05-03
 
 ### BREAKING
