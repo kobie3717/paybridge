@@ -1,6 +1,6 @@
 {
   "name": "paybridge",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "One API for fiat + crypto payments. Multi-provider routing, automatic failover, MoonPay on/off-ramp. SA-first, global-ready.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -33,7 +33,13 @@
     "mercadopago",
     "razorpay",
     "india",
-    "latam"
+    "latam",
+    "mollie",
+    "square",
+    "pesapal",
+    "transak",
+    "ramp",
+    "east-africa"
   ],
   "author": "Kobie Wentzel",
   "license": "MIT",

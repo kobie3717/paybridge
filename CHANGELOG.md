@@ -10,6 +10,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Planned
 - Yellow Card real spec verification (when partner docs available)
 
+## [0.6.0] - 2026-05-04
+
+### Added
+- **Mollie provider** (production) — EU-focused, 9 currencies (EUR/USD/GBP/CHF/CAD/AUD/DKK/SEK/NOK), payments + refunds. Subscriptions throw cleanly (Mollie requires Customer + Mandate setup not yet supported). Webhook verification documented as not-supported by Mollie's API design (use getPayment round-trip).
+- **Square provider** (production) — Payment Links API, 6 currencies (USD/CAD/GBP/AUD/EUR/JPY), idempotency keys, two-step status lookup (link → order), HMAC-SHA256 webhook with notification URL. Subscriptions throw cleanly (multi-step Catalog flow not yet supported).
+- **Pesapal provider** (production) — East Africa focus, 4 currencies (KES/UGX/TZS/USD), OAuth-style token caching, IPN-based webhook (no signature scheme; getPayment round-trip required).
+- **Transak crypto driver** (production) — global on/off-ramp, 6 assets, HMAC-SHA256 widget URL signing similar to MoonPay, status lookup via /api/v2/orders.
+- **Ramp Network crypto driver** (production) — global on/off-ramp, 6 assets, no widget signing (public hostApiKey only), HMAC webhook (TODO: migrate to ECDSA per Ramp's actual spec).
+
+### Changed
+- Added `'mollie' | 'square' | 'pesapal'` to `Provider` union (additive).
+- Added `'transak' | 'ramp'` to crypto provider union (additive).
+
 ## [0.5.0] - 2026-05-04
 
 ### Added

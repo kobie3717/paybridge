@@ -197,6 +197,9 @@ app.post('/webhook', express.raw({ type: 'application/json' }), (req, res) => {
 | **Adyen** | ✅ | ⛔ | ✅ | ✅ | **Production** |
 | **Mercado Pago** | ✅ | ✅ | ✅ | ✅ | **Production** |
 | **Razorpay** | ✅ | ✅ | ✅ | ✅ | **Production** |
+| **Mollie** | ✅ | ⛔ | ✅ | ✅ | **Production** |
+| **Square** | ✅ | ⛔ | ✅ | ✅ | **Production** |
+| **Pesapal** | ✅ | ⛔ | ✅ | ✅ | **Production** |
 
 ### Crypto on/off-ramp providers
 
@@ -204,6 +207,8 @@ app.post('/webhook', express.raw({ type: 'application/json' }), (req, res) => {
 |----------|---------|----------|-------|----------|--------|
 | **MoonPay** | ✅ | ✅ | ✅ | ✅ | **Production** |
 | **Yellow Card** | ⚠️ | ⚠️ | ⚠️ | ⚠️ | **Experimental** |
+| **Transak** | ✅ | ✅ | ✅ | ✅ | **Production** |
+| **Ramp Network** | ✅ | ✅ | ✅ | ✅ | **Production** |
 
 **Legend:** ✅ Supported | ⛔ Not supported by upstream API | ⚠️ Experimental (spec unverified)
 
@@ -312,6 +317,62 @@ const pay = new PayBridge({
 **Docs:** [Razorpay API Reference](https://razorpay.com/docs/api)
 
 **Note:** Razorpay webhooks do not include timestamp-based replay protection.
+
+### Mollie
+
+```typescript
+const pay = new PayBridge({
+  provider: 'mollie',
+  credentials: {
+    apiKey: 'test_...' // Or live_... for production
+  },
+  sandbox: true,
+  webhookSecret: 'optional_webhook_secret'
+});
+```
+
+**Docs:** [Mollie API Reference](https://docs.mollie.com/reference)
+
+**Note:** Mollie subscriptions require Customer + Mandate setup (not yet supported by paybridge). Mollie webhooks have no signature scheme — security relies on getPayment() round-trip + source IP validation.
+
+### Square
+
+```typescript
+const pay = new PayBridge({
+  provider: 'square',
+  credentials: {
+    apiKey: 'EAAAEOuL...', // Access token
+    locationId: 'LOCATION123',
+    notificationUrl: 'https://example.com/webhook' // Required for signature verification
+  },
+  sandbox: true,
+  webhookSecret: 'your_webhook_secret'
+});
+```
+
+**Docs:** [Square API Reference](https://developer.squareup.com/reference/square)
+
+**Note:** Square subscriptions require multi-step Catalog + Customer + Plan setup (not yet supported by paybridge). Webhook signature uses notificationUrl + raw body.
+
+### Pesapal
+
+```typescript
+const pay = new PayBridge({
+  provider: 'pesapal',
+  credentials: {
+    apiKey: 'qkio1BGG...', // consumer_key
+    secretKey: 'osGQ364R...', // consumer_secret
+    notificationId: 'IPN123', // Register IPN URL with Pesapal first
+    username: 'merchant@example.com' // Required for refunds
+  },
+  sandbox: true,
+  webhookSecret: 'optional_webhook_secret'
+});
+```
+
+**Docs:** [Pesapal API Reference](https://developer.pesapal.com/)
+
+**Note:** Pesapal subscriptions not yet supported. Pesapal IPN has no signature scheme — security relies on getPayment() round-trip + source IP validation. OAuth-style token caching (5min expiry).
 
 ## Switch Providers in 1 Line
 

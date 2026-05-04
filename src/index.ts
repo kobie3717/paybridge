@@ -17,6 +17,9 @@ import { FlutterwaveProvider } from './providers/flutterwave';
 import { AdyenProvider } from './providers/adyen';
 import { MercadoPagoProvider } from './providers/mercadopago';
 import { RazorpayProvider } from './providers/razorpay';
+import { MollieProvider } from './providers/mollie';
+import { SquareProvider } from './providers/square';
+import { PesapalProvider } from './providers/pesapal';
 
 import {
   PayBridgeConfig,
@@ -175,6 +178,41 @@ export class PayBridge {
         return new RazorpayProvider({
           keyId: credentials.apiKey,
           keySecret: credentials.secretKey,
+          sandbox,
+          webhookSecret,
+        });
+
+      case 'mollie':
+        if (!credentials.apiKey) {
+          throw new Error('Mollie requires apiKey (test_* or live_*)');
+        }
+        return new MollieProvider({
+          apiKey: credentials.apiKey,
+          sandbox,
+          webhookSecret,
+        });
+
+      case 'square':
+        if (!credentials.apiKey || !credentials.locationId) {
+          throw new Error('Square requires apiKey (access token) and locationId');
+        }
+        return new SquareProvider({
+          accessToken: credentials.apiKey,
+          locationId: credentials.locationId,
+          notificationUrl: credentials.notificationUrl,
+          sandbox,
+          webhookSecret,
+        });
+
+      case 'pesapal':
+        if (!credentials.apiKey || !credentials.secretKey) {
+          throw new Error('Pesapal requires apiKey (consumer_key) and secretKey (consumer_secret)');
+        }
+        return new PesapalProvider({
+          consumerKey: credentials.apiKey,
+          consumerSecret: credentials.secretKey,
+          notificationId: credentials.notificationId,
+          username: credentials.username,
           sandbox,
           webhookSecret,
         });

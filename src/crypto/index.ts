@@ -6,6 +6,8 @@ import { CryptoRampProvider } from './base';
 import { MoonPayProvider } from './moonpay';
 import { YellowCardProvider } from './yellowcard';
 import { MockCryptoRampProvider } from './mock';
+import { TransakProvider } from './transak';
+import { RampProvider } from './ramp';
 import {
   OnRampParams,
   OffRampParams,
@@ -19,9 +21,11 @@ export * from './base';
 export * from './moonpay';
 export * from './yellowcard';
 export * from './mock';
+export * from './transak';
+export * from './ramp';
 export * from './router';
 
-export type CryptoProvider = 'moonpay' | 'yellowcard' | 'mock';
+export type CryptoProvider = 'moonpay' | 'yellowcard' | 'mock' | 'transak' | 'ramp';
 
 export interface CryptoRampConfig {
   provider: CryptoProvider;
@@ -69,6 +73,27 @@ export class CryptoRamp {
           secretKey: credentials.secretKey,
           sandbox,
           webhookSecret,
+        });
+
+      case 'transak':
+        if (!credentials.apiKey || !credentials.secretKey) {
+          throw new Error('Transak requires apiKey and secretKey');
+        }
+        return new TransakProvider({
+          apiKey: credentials.apiKey,
+          apiSecret: credentials.secretKey,
+          sandbox,
+          webhookSecret,
+        });
+
+      case 'ramp':
+        if (!credentials.apiKey) {
+          throw new Error('Ramp Network requires apiKey (hostApiKey)');
+        }
+        return new RampProvider({
+          hostApiKey: credentials.apiKey,
+          webhookSecret,
+          sandbox,
         });
 
       case 'mock':

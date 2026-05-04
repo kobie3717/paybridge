@@ -4,7 +4,7 @@
 
 // ==================== Provider Types ====================
 
-export type Provider = 'softycomp' | 'yoco' | 'ozow' | 'payfast' | 'paystack' | 'stripe' | 'peach' | 'flutterwave' | 'adyen' | 'mercadopago' | 'razorpay';
+export type Provider = 'softycomp' | 'yoco' | 'ozow' | 'payfast' | 'paystack' | 'stripe' | 'peach' | 'flutterwave' | 'adyen' | 'mercadopago' | 'razorpay' | 'mollie' | 'square' | 'pesapal';
 
 export type PaymentStatus = 'pending' | 'completed' | 'failed' | 'cancelled' | 'refunded';
 
