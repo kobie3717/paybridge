@@ -6,6 +6,7 @@ import { runWebhook } from './commands/webhook';
 import { runQuote } from './commands/quote';
 import { runDrift } from './commands/drift';
 import { runDriftWatch } from './commands/drift-watch';
+import { runReconcileCommand } from './commands/reconcile';
 import { printHelp, printVersion } from './utils';
 
 async function main() {
@@ -29,6 +30,9 @@ async function main() {
       break;
     case 'drift-watch':
       await runDriftWatch(args);
+      break;
+    case 'reconcile':
+      await runReconcileCommand(args);
       break;
     case '-h':
     case '--help':

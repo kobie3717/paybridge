@@ -93,6 +93,7 @@ export default defineConfig({
           collapsed: true,
           items: [
             { text: 'Drift Detection', link: '/drift-detection' },
+            { text: 'Reconciliation', link: '/reconciliation' },
           ]
         },
         {

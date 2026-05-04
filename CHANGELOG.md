@@ -10,6 +10,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Planned
 - Yellow Card real spec verification (when partner docs available)
 
+## [0.11.0] - 2026-05-04
+
+### Added
+- **`paybridge reconcile` CLI command** — diff your DB's expected payment statuses against the provider's current state. Catches missed webhooks: anything where you marked a payment "pending" but the provider says "completed" means a webhook didn't reach you. Reads JSONL or CSV from stdin / `--input`. Exit code 1 if any mismatch, 0 if clean. Optional `--webhook-url` POSTs the mismatch report on detection. Supports `--json` for pipeline integration.
+- **Public reconcile module** — `runReconcile`, types `ReconcileRecord | ReconcileResult | ReconcileSummary` exported from `paybridge`. Use programmatically inside cron jobs, admin dashboards, or your own reconciliation pipeline.
+
+### Why this matters
+Webhook delivery is best-effort. Provider retries fail. Networks blip. Your own server hiccups. Without reconciliation, you discover missed webhooks by customer complaint. With `paybridge reconcile`, you discover them in 6h via a cron job.
+
 ## [0.10.0] - 2026-05-04
 
 ### Added

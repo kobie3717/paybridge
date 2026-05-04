@@ -49,6 +49,8 @@ export * from './tracer';
 export { createRedisCircuitBreakerStore, type RedisLike, type RedisStoreOptions } from './stores/redis';
 export { createRedisIdempotencyStore, type RedisIdempotencyStoreOptions } from './stores/redis-idempotency';
 export { createRedisLedgerStore, type RedisLedgerStoreOptions } from './stores/redis-ledger';
+export { runReconcile, type ReconcileDeps } from './cli/reconcile';
+export * from './cli/reconcile-types';
 
 export class PayBridge {
   public readonly provider: PaymentProvider;

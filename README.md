@@ -101,6 +101,46 @@ Exit code 1 if drift detected, 0 if clean. Perfect for CI/CD pipelines or cron j
 
 The Square `/checkout/payment-links → /online-checkout/payment-links` endpoint change would have shipped silently to production. With `drift-check` running daily, you get a Slack alert the moment it happens.
 
+## Reconciliation
+
+Webhooks can fail. Networks blip. Your server hiccups. Provider retries don't reach you. Without reconciliation, you discover missed webhooks when a customer complains their account wasn't credited.
+
+PayBridge's **reconcile** command diffs your database against each provider's current state, catching payments where your local status doesn't match reality.
+
+### Quick Start
+
+```bash
+# From JSONL file
+echo '{"provider":"stripe","reference":"pay_001","expectedStatus":"pending"}' > expected.jsonl
+npx paybridge reconcile --input expected.jsonl
+
+# From SQL query (Postgres example)
+psql -t -c "SELECT provider, reference, status AS \"expectedStatus\" FROM payments WHERE status='pending' AND created_at > now() - interval '24 hours'" \
+  | npx paybridge reconcile
+
+# CSV format
+cat payments.csv | npx paybridge reconcile
+```
+
+### Example Output
+
+```
+[✓] stripe:pay_001 — completed (match)
+[!] stripe:pay_002 — expected pending, actual completed (MISSED WEBHOOK)
+[?] paystack:pay_003 — not-found (no provider record)
+[✗] stripe:pay_004 — error (HTTP 503)
+[ ] adyen:pay_005 — skipped (missing ADYEN_API_KEY)
+
+Reconciled: 5
+  Match: 1
+  Mismatch (missed webhook): 1
+  Not found: 1
+  Error: 1
+  Skipped: 1
+```
+
+Exit code 1 if any mismatch, 0 if clean. Add `--webhook-url` to POST mismatch reports to Slack/Discord/your ops channel. Use `--json` for pipeline integration.
+
 ## Quick Start
 
 > **Upgrading from 0.1 or 0.2?** See [docs/migration.md](docs/migration.md).
