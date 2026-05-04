@@ -10,6 +10,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Planned
 - Yellow Card real spec verification (when partner docs available)
 
+## [1.0.0-rc.2] - 2026-05-04
+
+### Added
+- **`paybridge audit` CLI command** — single-command comprehensive report aggregating drift detection, reconciliation, success rate analytics, latency p95, fee estimation, and anomaly detection across all configured providers. Outputs HTML, Markdown, or JSON. The HTML variant is print-to-PDF friendly and the artifact a CFO can review directly.
+- **Public API**: `generateAuditReport`, `renderAuditAsHtml`, `renderAuditAsMarkdown`, `renderAuditAsJson` exported from `paybridge`. Use programmatically in admin dashboards, scheduled reports, or CI-CD pipelines that gate deploys on payment-stack anomalies.
+- Anomaly detection: success-rate drops (compares current half-window vs previous half-window, flags >10% drop), consecutive failure runs (3+ consecutive failed/timeout/rate_limited entries), high p95 latency (>2s/5s/10s thresholds with low/medium/high severity), drift baseline events, PII appearing in raw responses.
+
+### Why this matters
+Observability features live in silos. Drift detection is one CLI command. Reconciliation is another. Success rates are third-party dashboards. Latency is logs. Audit reports unify every signal into one artifact. One cron job. One file. One browser tab. The output a CFO opens to assess payment-stack health.
+
 ## [1.0.0-rc.1] - 2026-05-04
 
 **Release candidate.** Feature-complete for 1.0. The public API surface listed in `STABILITY.md` is locked from this point forward — breaking changes will only land in 2.0+ unless a security issue forces an exception. Promoting to stable `1.0.0` after 30 days of no breakage on `master` and at least one external production user.

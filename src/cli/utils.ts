@@ -72,6 +72,8 @@ COMMANDS
   drift-check [opts]      Capture/compare provider response shapes (drift detection)
   drift-watch [opts]      Run drift-check on a loop (long-running monitor)
   reconcile [opts]        Reconcile your DB against provider state (detects missed webhooks)
+  audit [opts]            Generate comprehensive audit report (drift + reconcile +
+                          success rates + fees + anomalies)
   help, -h, --help        Print this help
   version, -v             Print version
 
@@ -98,6 +100,8 @@ EXAMPLES
   paybridge drift-watch --interval 1h --webhook-url https://hooks.slack.com/...
   paybridge reconcile --input expected.jsonl
   psql -t -c "SELECT provider, reference, status FROM payments" | paybridge reconcile
+  paybridge audit --window 30d --ledger-pg postgresql://localhost/db
+  paybridge audit --output - --format md | mail -s "Audit" finance@example.com
 
 Docs: https://github.com/kobie3717/paybridge
 `.trim();

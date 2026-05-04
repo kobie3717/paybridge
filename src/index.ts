@@ -53,6 +53,18 @@ export { createPostgresLedgerStore, type PostgresLedgerStoreOptions, getCreateTa
 export type { PgPoolLike, PgQueryResult } from './stores/postgres';
 export { runReconcile, type ReconcileDeps } from './cli/reconcile';
 export * from './cli/reconcile-types';
+export * from './drift-detector';
+export { FileDriftStore, type DriftStore } from './cli/drift-store';
+export {
+  generateAuditReport,
+  renderAuditAsHtml,
+  renderAuditAsMarkdown,
+  renderAuditAsJson,
+  type AuditInput,
+  type AuditReport,
+  type ProviderAuditSection,
+  type AuditAnomaly,
+} from './audit-report';
 
 export class PayBridge {
   public readonly provider: PaymentProvider;

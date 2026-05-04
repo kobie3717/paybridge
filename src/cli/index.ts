@@ -7,6 +7,7 @@ import { runQuote } from './commands/quote';
 import { runDrift } from './commands/drift';
 import { runDriftWatch } from './commands/drift-watch';
 import { runReconcileCommand } from './commands/reconcile';
+import { runAudit } from './commands/audit';
 import { printHelp, printVersion } from './utils';
 
 async function main() {
@@ -33,6 +34,9 @@ async function main() {
       break;
     case 'reconcile':
       await runReconcileCommand(args);
+      break;
+    case 'audit':
+      await runAudit(args);
       break;
     case '-h':
     case '--help':

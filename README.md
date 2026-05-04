@@ -101,6 +101,76 @@ Exit code 1 if drift detected, 0 if clean. Perfect for CI/CD pipelines or cron j
 
 The Square `/checkout/payment-links → /online-checkout/payment-links` endpoint change would have shipped silently to production. With `drift-check` running daily, you get a Slack alert the moment it happens.
 
+## Audit Reports
+
+Your payment stack generates signals across silos: drift detection in one CLI command, reconciliation in another, success rates in third-party dashboards, latency buried in logs. **Audit reports** unify every observability feature into one comprehensive artifact.
+
+```bash
+# Generate HTML report (default)
+npx paybridge audit --window 30d --ledger-pg postgresql://localhost/db
+
+# JSON for CI/CD pipelines
+npx paybridge audit --format json --output - | jq '.summary.anomalyCounts.high' | \
+  xargs -I {} test {} -eq 0 || exit 1
+
+# Markdown for email
+npx paybridge audit --format md --output - | mail -s "Monthly Audit" finance@example.com
+
+# Include reconciliation data
+npx paybridge audit --reconcile-input expected.jsonl --window 7d
+```
+
+### What's Included
+
+- **Success rate analytics** — per-provider success/failure/timeout counts with half-window comparison (detects degradation)
+- **Latency metrics** — avg + p95 per provider, with anomaly detection (>2s/5s/10s thresholds)
+- **Fee estimation** — calculated from actual transaction volume × provider fee structure
+- **Drift events** — timeline of baseline captures per provider
+- **Reconciliation** — missed webhook count + mismatch table (if `--reconcile-input` provided)
+- **Anomaly detection** — success rate drops (>10% decline), consecutive failures (3+), high latency, PII in raw responses
+- **Compliance flags** — scans metadata for PII leakage (email, card_number, iban, etc.)
+
+### Output Formats
+
+- **HTML** — dark mode, print-to-PDF friendly (Cmd/Ctrl+P), collapsible per-provider deep-dive. The artifact a CFO opens in a browser.
+- **Markdown** — copy-paste into Notion/Confluence/Slack. Clean GFM tables.
+- **JSON** — machine-readable. Pipe to CI/CD gates, monitoring dashboards, or alerting systems.
+
+### Exit Codes
+
+- `0` — no high-severity anomalies
+- `1` — high-severity anomalies detected (fails CI builds)
+
+### Cron Integration
+
+```bash
+# Daily 6 AM audit
+0 6 * * * cd /app && npx paybridge audit --window 7d --ledger-pg $DB_URL --output /var/reports/audit-$(date +\%Y-\%m-\%d).html
+```
+
+### Programmatic API
+
+```typescript
+import { generateAuditReport, renderAuditAsHtml } from 'paybridge';
+import { createPostgresLedgerStore } from 'paybridge';
+import { Pool } from 'pg';
+
+const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+const ledger = createPostgresLedgerStore({ pool });
+
+const report = await generateAuditReport({
+  providers: [
+    { name: 'stripe', capabilities: stripeProvider.getCapabilities() },
+    { name: 'paystack', capabilities: paystackProvider.getCapabilities() },
+  ],
+  ledger,
+  windowMs: 30 * 24 * 60 * 60 * 1000, // 30 days
+});
+
+const html = renderAuditAsHtml(report);
+await sendEmail({ to: 'finance@company.com', html });
+```
+
 ## Reconciliation
 
 Webhooks can fail. Networks blip. Your server hiccups. Provider retries don't reach you. Without reconciliation, you discover missed webhooks when a customer complains their account wasn't credited.
