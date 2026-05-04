@@ -10,6 +10,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Planned
 - Yellow Card real spec verification (when partner docs available)
 
+## [1.0.0-rc.1] - 2026-05-04
+
+**Release candidate.** Feature-complete for 1.0. The public API surface listed in `STABILITY.md` is locked from this point forward — breaking changes will only land in 2.0+ unless a security issue forces an exception. Promoting to stable `1.0.0` after 30 days of no breakage on `master` and at least one external production user.
+
+### Status of STABILITY.md gates
+
+- ✅ Sandbox-validated: 9 of 11 fiat providers + MoonPay caught real bugs (Square endpoint, PayStack currency, Pesapal IPN). Stripe / PayStack / PayFast / Flutterwave / Razorpay / Mollie / Square / Mercado Pago / Pesapal validated against live test APIs.
+- ⏸ Yellow Card real spec: still blocked on partner docs. Driver remains `@experimental` and emits a warning on instantiation.
+- ⏸ MoonPay sell_quote endpoint: not yet validated against live sandbox (TODO(verify) markers retained in code).
+- ⏸ PayFast Query API + refund: not yet validated against live sandbox (TODO(verify) markers retained).
+- ✅ Zero `TODO(verify)` markers in production-critical paths — all remaining markers are explicit deferrals to v1.1+.
+- ⏳ 30 days of no API breakage on master: starts now.
+- ⏳ At least one external production user: open ask.
+
+### What's locked
+See `STABILITY.md` for the full public API surface.
+
+### Install
+
+```bash
+npm install paybridge@next
+```
+
+The `next` dist-tag is set to RC. The `latest` dist-tag still points to 0.12.0 until 1.0.0 stable.
+
 ## [0.12.0] - 2026-05-04
 
 ### Added
