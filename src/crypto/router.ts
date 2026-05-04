@@ -15,6 +15,10 @@ import {
   RoutingMeta,
 } from '../routing-types';
 import { CircuitBreaker } from '../circuit-breaker';
+import { RouterEventEmitter } from '../router-events';
+import type { LedgerStore } from '../ledger';
+import type { TracerLike } from '../tracer';
+import { noopTracer } from '../tracer';
 
 function sanitizeErrorMessage(msg: string | undefined): string {
   if (!msg) return 'unknown error';
@@ -31,6 +35,8 @@ export interface CryptoRampRouterConfig {
   allowExperimental?: boolean;
   circuitBreakerStore?: import('../circuit-breaker-store').CircuitBreakerStore;
   idempotencyStore?: import('../webhook-idempotency-store').IdempotencyStore;
+  ledger?: LedgerStore;
+  tracer?: TracerLike;
 }
 
 interface ProviderWithMeta {
@@ -41,11 +47,14 @@ interface ProviderWithMeta {
 type CryptoStrategy = 'cheapest' | 'priority' | 'round-robin' | 'fastest';
 
 export class CryptoRampRouter {
+  readonly events = new RouterEventEmitter();
   private providers: ProviderWithMeta[];
   private strategy: CryptoStrategy;
   private fallback: { enabled: boolean; maxAttempts: number; retryDelayMs: number };
   private allowExperimental: boolean;
   private circuitBreakers: Map<string, CircuitBreaker>;
+  private ledger?: LedgerStore;
+  private tracer: TracerLike;
   private rrIndex = 0;
   private config: CryptoRampRouterConfig;
 
@@ -62,16 +71,37 @@ export class CryptoRampRouter {
       retryDelayMs: config.fallback?.retryDelayMs ?? 250,
     };
     this.allowExperimental = config.allowExperimental ?? false;
+    this.ledger = config.ledger;
+    this.tracer = config.tracer ?? noopTracer;
     this.circuitBreakers = new Map();
 
     for (const p of this.providers) {
       const name = p.instance.getProviderName();
-      this.circuitBreakers.set(
-        name,
-        new CircuitBreaker(name, {
-          store: config.circuitBreakerStore,
-        })
-      );
+      const breaker = new CircuitBreaker(name, {
+        store: config.circuitBreakerStore,
+      });
+      breaker.events.on('opened', (key) => {
+        this.events.emitEvent({
+          type: 'circuit.opened',
+          provider: key,
+          timestamp: new Date().toISOString(),
+        });
+      });
+      breaker.events.on('half_opened', (key) => {
+        this.events.emitEvent({
+          type: 'circuit.half_opened',
+          provider: key,
+          timestamp: new Date().toISOString(),
+        });
+      });
+      breaker.events.on('closed', (key) => {
+        this.events.emitEvent({
+          type: 'circuit.closed',
+          provider: key,
+          timestamp: new Date().toISOString(),
+        });
+      });
+      this.circuitBreakers.set(name, breaker);
     }
   }
 
@@ -186,6 +216,13 @@ export class CryptoRampRouter {
       }
 
       const startTime = Date.now();
+      this.events.emitEvent({
+        type: 'attempt.start',
+        provider: providerName,
+        operation: 'createOnRamp',
+        attempt: attempts.length + 1,
+        timestamp: new Date().toISOString(),
+      });
       try {
         const result = await providerMeta.instance.createOnRamp(params);
         const latencyMs = Date.now() - startTime;
@@ -195,6 +232,34 @@ export class CryptoRampRouter {
           provider: providerName,
           status: 'success',
           latencyMs,
+        });
+
+        this.events.emitEvent({
+          type: 'attempt.success',
+          provider: providerName,
+          operation: 'createOnRamp',
+          durationMs: latencyMs,
+          attempt: attempts.length,
+          timestamp: new Date().toISOString(),
+        });
+        this.events.emitEvent({
+          type: 'request.success',
+          provider: providerName,
+          operation: 'createOnRamp',
+          durationMs: latencyMs,
+          timestamp: new Date().toISOString(),
+        });
+
+        await this.recordLedgerEntry({
+          id: `${providerName}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          timestamp: new Date().toISOString(),
+          operation: 'createOnRamp',
+          provider: providerName,
+          providerId: result.id,
+          status: 'success',
+          amount: params.fiatAmount,
+          currency: params.fiatCurrency,
+          durationMs: latencyMs,
         });
 
         const routingMeta: RoutingMeta = {
@@ -220,6 +285,17 @@ export class CryptoRampRouter {
           latencyMs,
         });
 
+        this.events.emitEvent({
+          type: 'attempt.failure',
+          provider: providerName,
+          operation: 'createOnRamp',
+          durationMs: latencyMs,
+          errorCode: error.code,
+          errorMessage: sanitizeErrorMessage(error.message),
+          attempt: attempts.length,
+          timestamp: new Date().toISOString(),
+        });
+
         if (!this.fallback.enabled || attempts.length >= this.fallback.maxAttempts) {
           break;
         }
@@ -228,6 +304,12 @@ export class CryptoRampRouter {
       }
     }
 
+    this.events.emitEvent({
+      type: 'request.failure',
+      operation: 'createOnRamp',
+      errorMessage: lastError?.message || 'All providers failed',
+      timestamp: new Date().toISOString(),
+    });
     throw new RoutingError(
       `All providers failed: ${lastError?.message || 'Unknown error'}`,
       attempts
@@ -266,6 +348,13 @@ export class CryptoRampRouter {
       }
 
       const startTime = Date.now();
+      this.events.emitEvent({
+        type: 'attempt.start',
+        provider: providerName,
+        operation: 'createOffRamp',
+        attempt: attempts.length + 1,
+        timestamp: new Date().toISOString(),
+      });
       try {
         const result = await providerMeta.instance.createOffRamp(params);
         const latencyMs = Date.now() - startTime;
@@ -275,6 +364,34 @@ export class CryptoRampRouter {
           provider: providerName,
           status: 'success',
           latencyMs,
+        });
+
+        this.events.emitEvent({
+          type: 'attempt.success',
+          provider: providerName,
+          operation: 'createOffRamp',
+          durationMs: latencyMs,
+          attempt: attempts.length,
+          timestamp: new Date().toISOString(),
+        });
+        this.events.emitEvent({
+          type: 'request.success',
+          provider: providerName,
+          operation: 'createOffRamp',
+          durationMs: latencyMs,
+          timestamp: new Date().toISOString(),
+        });
+
+        await this.recordLedgerEntry({
+          id: `${providerName}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          timestamp: new Date().toISOString(),
+          operation: 'createOffRamp',
+          provider: providerName,
+          providerId: result.id,
+          status: 'success',
+          amount: params.cryptoAmount,
+          currency: params.fiatCurrency,
+          durationMs: latencyMs,
         });
 
         const routingMeta: RoutingMeta = {
@@ -300,6 +417,17 @@ export class CryptoRampRouter {
           latencyMs,
         });
 
+        this.events.emitEvent({
+          type: 'attempt.failure',
+          provider: providerName,
+          operation: 'createOffRamp',
+          durationMs: latencyMs,
+          errorCode: error.code,
+          errorMessage: sanitizeErrorMessage(error.message),
+          attempt: attempts.length,
+          timestamp: new Date().toISOString(),
+        });
+
         if (!this.fallback.enabled || attempts.length >= this.fallback.maxAttempts) {
           break;
         }
@@ -308,6 +436,12 @@ export class CryptoRampRouter {
       }
     }
 
+    this.events.emitEvent({
+      type: 'request.failure',
+      operation: 'createOffRamp',
+      errorMessage: lastError?.message || 'All providers failed',
+      timestamp: new Date().toISOString(),
+    });
     throw new RoutingError(
       `All providers failed: ${lastError?.message || 'Unknown error'}`,
       attempts
@@ -414,5 +548,20 @@ export class CryptoRampRouter {
 
   private sleep(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  private async recordLedgerEntry(entry: import('../ledger').LedgerEntry): Promise<void> {
+    if (!this.ledger) return;
+    try {
+      await this.ledger.append(entry);
+    } catch (err) {
+      this.events.emitEvent({
+        type: 'attempt.failure',
+        operation: entry.operation as any,
+        provider: entry.provider,
+        errorMessage: 'Ledger write failed',
+        timestamp: new Date().toISOString(),
+      });
+    }
   }
 }

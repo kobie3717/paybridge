@@ -12,6 +12,12 @@ export interface RedisLike {
   get(key: string): Promise<string | null>;
   set(key: string, value: string, ...args: any[]): Promise<any>;
   del(key: string): Promise<any>;
+  lpush?(key: string, ...values: string[]): Promise<number>;
+  ltrim?(key: string, start: number, stop: number): Promise<string>;
+  lrange?(key: string, start: number, stop: number): Promise<string[]>;
+  sadd?(key: string, ...members: string[]): Promise<number>;
+  smembers?(key: string): Promise<string[]>;
+  expire?(key: string, seconds: number): Promise<number>;
 }
 
 export interface RedisStoreOptions {

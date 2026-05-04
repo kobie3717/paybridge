@@ -24,6 +24,10 @@ import { ProviderWithMeta, getStrategy, StrategyContext } from './strategies';
 import { CircuitBreaker } from './circuit-breaker';
 import { HttpError, FetchTimeoutError } from './utils/fetch';
 import type { IdempotencyStore } from './webhook-idempotency-store';
+import { RouterEventEmitter } from './router-events';
+import type { LedgerStore } from './ledger';
+import type { TracerLike } from './tracer';
+import { noopTracer } from './tracer';
 
 function sanitizeErrorMessage(msg: string | undefined): string {
   if (!msg) return 'unknown error';
@@ -54,14 +58,19 @@ export interface PayBridgeRouterConfig {
   fallback?: FallbackConfig;
   circuitBreakerStore?: import('./circuit-breaker-store').CircuitBreakerStore;
   idempotencyStore?: IdempotencyStore;
+  ledger?: LedgerStore;
+  tracer?: TracerLike;
 }
 
 export class PayBridgeRouter {
+  readonly events = new RouterEventEmitter();
   private providers: ProviderWithMeta[];
   private strategy: RoutingStrategy;
   private fallback: FallbackConfig;
   private circuitBreakers: Map<string, CircuitBreaker>;
   private idempotencyStore?: IdempotencyStore;
+  private ledger?: LedgerStore;
+  private tracer: TracerLike;
   private rrIndex = 0;
   private config: PayBridgeRouterConfig;
 
@@ -79,16 +88,37 @@ export class PayBridgeRouter {
       retryDelayMs: config.fallback?.retryDelayMs ?? 250,
     };
     this.idempotencyStore = config.idempotencyStore;
+    this.ledger = config.ledger;
+    this.tracer = config.tracer ?? noopTracer;
     this.circuitBreakers = new Map();
 
     for (const p of this.providers) {
       const name = p.instance.getProviderName();
-      this.circuitBreakers.set(
-        name,
-        new CircuitBreaker(name, {
-          store: config.circuitBreakerStore,
-        })
-      );
+      const breaker = new CircuitBreaker(name, {
+        store: config.circuitBreakerStore,
+      });
+      breaker.events.on('opened', (key) => {
+        this.events.emitEvent({
+          type: 'circuit.opened',
+          provider: key,
+          timestamp: new Date().toISOString(),
+        });
+      });
+      breaker.events.on('half_opened', (key) => {
+        this.events.emitEvent({
+          type: 'circuit.half_opened',
+          provider: key,
+          timestamp: new Date().toISOString(),
+        });
+      });
+      breaker.events.on('closed', (key) => {
+        this.events.emitEvent({
+          type: 'circuit.closed',
+          provider: key,
+          timestamp: new Date().toISOString(),
+        });
+      });
+      this.circuitBreakers.set(name, breaker);
     }
   }
 
@@ -134,15 +164,61 @@ export class PayBridgeRouter {
       }
 
       const startTime = Date.now();
+      const span = this.tracer.startSpan('paybridge.router.createPayment', {
+        'paybridge.provider': providerName,
+        'paybridge.strategy': this.strategy,
+        'paybridge.attempt': attempts.length + 1,
+      });
+      this.events.emitEvent({
+        type: 'attempt.start',
+        provider: providerName,
+        operation: 'createPayment',
+        reference: params.reference,
+        attempt: attempts.length + 1,
+        timestamp: new Date().toISOString(),
+      });
       try {
         const result = await providerMeta.instance.createPayment(params);
         const latencyMs = Date.now() - startTime;
 
+        span.setAttribute('paybridge.payment.id', result.id);
+        span.setAttribute('paybridge.payment.status', result.status);
         if (breaker) await breaker.recordSuccess();
         attempts.push({
           provider: providerName,
           status: 'success',
           latencyMs,
+        });
+
+        this.events.emitEvent({
+          type: 'attempt.success',
+          provider: providerName,
+          operation: 'createPayment',
+          reference: params.reference,
+          durationMs: latencyMs,
+          attempt: attempts.length,
+          timestamp: new Date().toISOString(),
+        });
+        this.events.emitEvent({
+          type: 'request.success',
+          provider: providerName,
+          operation: 'createPayment',
+          reference: params.reference,
+          durationMs: latencyMs,
+          timestamp: new Date().toISOString(),
+        });
+
+        await this.recordLedgerEntry({
+          id: `${providerName}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          timestamp: new Date().toISOString(),
+          operation: 'createPayment',
+          provider: providerName,
+          reference: params.reference,
+          providerId: result.id,
+          status: 'success',
+          amount: params.amount,
+          currency: params.currency,
+          durationMs: latencyMs,
         });
 
         const routingMeta: RoutingMeta = {
@@ -151,16 +227,25 @@ export class PayBridgeRouter {
           strategy: this.strategy,
         };
 
+        span.end();
         return {
           ...result,
           routingMeta,
         };
       } catch (error: any) {
+        span.recordException?.(error instanceof Error ? error : new Error(String(error)));
         const latencyMs = Date.now() - startTime;
         lastError = error;
 
         const isRateLimited = error instanceof HttpError &&
           (error.status === 429 || (error.status === 503 && error.retryAfterMs !== undefined));
+
+        let errorCode = error.code;
+        if (error instanceof FetchTimeoutError) {
+          errorCode = 'TIMEOUT';
+        } else if (isRateLimited) {
+          errorCode = 'RATE_LIMITED';
+        }
 
         if (isRateLimited) {
           attempts.push({
@@ -170,13 +255,32 @@ export class PayBridgeRouter {
             errorMessage: sanitizeErrorMessage(error.message),
             latencyMs,
           });
+          this.events.emitEvent({
+            type: 'attempt.rate_limited',
+            provider: providerName,
+            operation: 'createPayment',
+            reference: params.reference,
+            durationMs: latencyMs,
+            errorCode: 'RATE_LIMITED',
+            errorMessage: sanitizeErrorMessage(error.message),
+            attempt: attempts.length,
+            timestamp: new Date().toISOString(),
+          });
+          await this.recordLedgerEntry({
+            id: `${providerName}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            timestamp: new Date().toISOString(),
+            operation: 'createPayment',
+            provider: providerName,
+            reference: params.reference,
+            status: 'rate_limited',
+            amount: params.amount,
+            currency: params.currency,
+            durationMs: latencyMs,
+            errorCode: 'RATE_LIMITED',
+            errorMessage: sanitizeErrorMessage(error.message),
+          });
         } else {
           if (breaker) await breaker.recordFailure();
-
-          let errorCode = error.code;
-          if (error instanceof FetchTimeoutError) {
-            errorCode = 'TIMEOUT';
-          }
 
           attempts.push({
             provider: providerName,
@@ -185,7 +289,36 @@ export class PayBridgeRouter {
             errorMessage: sanitizeErrorMessage(error.message),
             latencyMs,
           });
+          const eventType = error instanceof FetchTimeoutError ? 'attempt.timeout' : 'attempt.failure';
+          this.events.emitEvent({
+            type: eventType,
+            provider: providerName,
+            operation: 'createPayment',
+            reference: params.reference,
+            durationMs: latencyMs,
+            errorCode,
+            errorMessage: sanitizeErrorMessage(error.message),
+            attempt: attempts.length,
+            timestamp: new Date().toISOString(),
+          });
+          const ledgerStatus = error instanceof FetchTimeoutError ? 'timeout' : 'failed';
+          await this.recordLedgerEntry({
+            id: `${providerName}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            timestamp: new Date().toISOString(),
+            operation: 'createPayment',
+            provider: providerName,
+            reference: params.reference,
+            status: ledgerStatus,
+            amount: params.amount,
+            currency: params.currency,
+            durationMs: latencyMs,
+            errorCode,
+            errorMessage: sanitizeErrorMessage(error.message),
+          });
         }
+
+        span.setAttribute('paybridge.error.code', errorCode ?? 'unknown');
+        span.end();
 
         if (!this.fallback.enabled || attempts.length >= (this.fallback.maxAttempts ?? 3)) {
           break;
@@ -195,6 +328,13 @@ export class PayBridgeRouter {
       }
     }
 
+    this.events.emitEvent({
+      type: 'request.failure',
+      operation: 'createPayment',
+      reference: params.reference,
+      errorMessage: lastError?.message || 'All providers failed',
+      timestamp: new Date().toISOString(),
+    });
     throw new RoutingError(
       `All providers failed: ${lastError?.message || 'Unknown error'}`,
       attempts
@@ -239,6 +379,14 @@ export class PayBridgeRouter {
       }
 
       const startTime = Date.now();
+      this.events.emitEvent({
+        type: 'attempt.start',
+        provider: providerName,
+        operation: 'createSubscription',
+        reference: params.reference,
+        attempt: attempts.length + 1,
+        timestamp: new Date().toISOString(),
+      });
       try {
         const result = await providerMeta.instance.createSubscription(params);
         const latencyMs = Date.now() - startTime;
@@ -248,6 +396,37 @@ export class PayBridgeRouter {
           provider: providerName,
           status: 'success',
           latencyMs,
+        });
+
+        this.events.emitEvent({
+          type: 'attempt.success',
+          provider: providerName,
+          operation: 'createSubscription',
+          reference: params.reference,
+          durationMs: latencyMs,
+          attempt: attempts.length,
+          timestamp: new Date().toISOString(),
+        });
+        this.events.emitEvent({
+          type: 'request.success',
+          provider: providerName,
+          operation: 'createSubscription',
+          reference: params.reference,
+          durationMs: latencyMs,
+          timestamp: new Date().toISOString(),
+        });
+
+        await this.recordLedgerEntry({
+          id: `${providerName}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          timestamp: new Date().toISOString(),
+          operation: 'createSubscription',
+          provider: providerName,
+          reference: params.reference,
+          providerId: result.id,
+          status: 'success',
+          amount: params.amount,
+          currency: params.currency,
+          durationMs: latencyMs,
         });
 
         return result;
@@ -266,6 +445,30 @@ export class PayBridgeRouter {
             errorMessage: sanitizeErrorMessage(error.message),
             latencyMs,
           });
+          this.events.emitEvent({
+            type: 'attempt.rate_limited',
+            provider: providerName,
+            operation: 'createSubscription',
+            reference: params.reference,
+            durationMs: latencyMs,
+            errorCode: 'RATE_LIMITED',
+            errorMessage: sanitizeErrorMessage(error.message),
+            attempt: attempts.length,
+            timestamp: new Date().toISOString(),
+          });
+          await this.recordLedgerEntry({
+            id: `${providerName}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            timestamp: new Date().toISOString(),
+            operation: 'createSubscription',
+            provider: providerName,
+            reference: params.reference,
+            status: 'rate_limited',
+            amount: params.amount,
+            currency: params.currency,
+            durationMs: latencyMs,
+            errorCode: 'RATE_LIMITED',
+            errorMessage: sanitizeErrorMessage(error.message),
+          });
         } else {
           if (breaker) await breaker.recordFailure();
 
@@ -281,6 +484,32 @@ export class PayBridgeRouter {
             errorMessage: sanitizeErrorMessage(error.message),
             latencyMs,
           });
+          const eventType = error instanceof FetchTimeoutError ? 'attempt.timeout' : 'attempt.failure';
+          this.events.emitEvent({
+            type: eventType,
+            provider: providerName,
+            operation: 'createSubscription',
+            reference: params.reference,
+            durationMs: latencyMs,
+            errorCode,
+            errorMessage: sanitizeErrorMessage(error.message),
+            attempt: attempts.length,
+            timestamp: new Date().toISOString(),
+          });
+          const ledgerStatus = error instanceof FetchTimeoutError ? 'timeout' : 'failed';
+          await this.recordLedgerEntry({
+            id: `${providerName}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            timestamp: new Date().toISOString(),
+            operation: 'createSubscription',
+            provider: providerName,
+            reference: params.reference,
+            status: ledgerStatus,
+            amount: params.amount,
+            currency: params.currency,
+            durationMs: latencyMs,
+            errorCode,
+            errorMessage: sanitizeErrorMessage(error.message),
+          });
         }
 
         if (!this.fallback.enabled || attempts.length >= (this.fallback.maxAttempts ?? 3)) {
@@ -291,6 +520,13 @@ export class PayBridgeRouter {
       }
     }
 
+    this.events.emitEvent({
+      type: 'request.failure',
+      operation: 'createSubscription',
+      reference: params.reference,
+      errorMessage: lastError?.message || 'All providers failed',
+      timestamp: new Date().toISOString(),
+    });
     throw new RoutingError(
       `All providers failed for subscription: ${lastError?.message || 'Unknown error'}`,
       attempts
@@ -363,6 +599,13 @@ export class PayBridgeRouter {
         const ttlMs = 24 * 60 * 60 * 1000;
         const isNew = await this.idempotencyStore.recordIfNew(key, ttlMs);
         if (!isNew) {
+          this.events.emitEvent({
+            type: 'webhook.duplicate',
+            provider: providerName,
+            operation: 'parseWebhook',
+            reference: eventId,
+            timestamp: new Date().toISOString(),
+          });
           throw new WebhookDuplicateError(providerName, eventId);
         }
       }
@@ -403,5 +646,20 @@ export class PayBridgeRouter {
 
   private sleep(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  private async recordLedgerEntry(entry: import('./ledger').LedgerEntry): Promise<void> {
+    if (!this.ledger) return;
+    try {
+      await this.ledger.append(entry);
+    } catch (err) {
+      this.events.emitEvent({
+        type: 'attempt.failure',
+        operation: entry.operation as any,
+        provider: entry.provider,
+        errorMessage: 'Ledger write failed',
+        timestamp: new Date().toISOString(),
+      });
+    }
   }
 }

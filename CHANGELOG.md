@@ -10,6 +10,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Planned
 - Yellow Card real spec verification (when partner docs available)
 
+## [0.4.0] - 2026-05-04
+
+### Added
+- **Router events** — `PayBridgeRouter.events` and `CryptoRampRouter.events` are now public `EventEmitter` instances emitting structured `RouterEvent` objects. Event types: `attempt.start | attempt.success | attempt.failure | attempt.rate_limited | attempt.timeout | circuit.opened | circuit.half_opened | circuit.closed | webhook.duplicate | request.success | request.failure`. Wildcard listener via `events.on('*', ...)`. Zero overhead when no listeners attached.
+- **Payment ledger** — pluggable `LedgerStore` interface for persisting every attempt + outcome. `InMemoryLedgerStore` (FIFO, configurable `maxSize`) and `createRedisLedgerStore` adapter. Optional `ledger` config on both routers; ledger failures are non-fatal (swallowed + emitted as event). `LedgerEntry` includes timestamp, provider, operation, status, reference, durationMs, errorCode, errorMessage.
+- **Tracer interface** — `TracerLike` and `SpanLike` types for OpenTelemetry-compatible distributed tracing. Optional `tracer` config on both routers; defaults to `noopTracer` (zero overhead). Plug `@opentelemetry/api` directly:
+  ```ts
+  import { trace } from '@opentelemetry/api';
+  new PayBridgeRouter({ providers, tracer: trace.getTracer('paybridge') });
+  ```
+  Spans are emitted per attempt with `paybridge.provider`, `paybridge.strategy`, `paybridge.attempt`, `paybridge.payment.id`, `paybridge.payment.status`, `paybridge.error.code` attributes.
+
+### Changed
+- Circuit breaker now emits `opened`, `half_opened`, `closed` events on state transitions (accessible via `breaker.events`). PayBridgeRouter and CryptoRampRouter subscribe to these and re-emit as `circuit.*` router events.
+
 ## [0.3.1] - 2026-05-03
 
 ### Added
