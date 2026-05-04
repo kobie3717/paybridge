@@ -20,7 +20,7 @@ import {
   RoutingAttempt,
   RoutingError,
 } from './routing-types';
-import { ProviderWithMeta, getStrategy, StrategyContext } from './strategies';
+import { ProviderWithMeta, getStrategy, StrategyContext, type SuccessRateStrategy } from './strategies';
 import { CircuitBreaker } from './circuit-breaker';
 import { HttpError, FetchTimeoutError } from './utils/fetch';
 import type { IdempotencyStore } from './webhook-idempotency-store';
@@ -54,7 +54,7 @@ export interface PayBridgeRouterConfig {
     weight?: number;
     priority?: number;
   }>;
-  strategy?: RoutingStrategy;
+  strategy?: RoutingStrategy | SuccessRateStrategy;
   fallback?: FallbackConfig;
   circuitBreakerStore?: import('./circuit-breaker-store').CircuitBreakerStore;
   idempotencyStore?: IdempotencyStore;
@@ -65,7 +65,7 @@ export interface PayBridgeRouterConfig {
 export class PayBridgeRouter {
   readonly events = new RouterEventEmitter();
   private providers: ProviderWithMeta[];
-  private strategy: RoutingStrategy;
+  private strategy: RoutingStrategy | SuccessRateStrategy;
   private fallback: FallbackConfig;
   private circuitBreakers: Map<string, CircuitBreaker>;
   private idempotencyStore?: IdempotencyStore;
@@ -139,12 +139,17 @@ export class PayBridgeRouter {
       );
     }
 
-    const strategyFn = getStrategy(this.strategy);
-    const ordered = strategyFn(filtered, context, () => {
-      const idx = this.rrIndex;
-      this.rrIndex = (this.rrIndex + 1) % filtered.length;
-      return idx;
-    });
+    let ordered: ProviderWithMeta[];
+    if (typeof this.strategy === 'string') {
+      const strategyFn = getStrategy(this.strategy);
+      ordered = strategyFn(filtered, context, () => {
+        const idx = this.rrIndex;
+        this.rrIndex = (this.rrIndex + 1) % filtered.length;
+        return idx;
+      });
+    } else {
+      ordered = await this.strategy.order(filtered);
+    }
 
     const attempts: RoutingAttempt[] = [];
     let lastError: Error | null = null;
@@ -166,7 +171,7 @@ export class PayBridgeRouter {
       const startTime = Date.now();
       const span = this.tracer.startSpan('paybridge.router.createPayment', {
         'paybridge.provider': providerName,
-        'paybridge.strategy': this.strategy,
+        'paybridge.strategy': typeof this.strategy === 'string' ? this.strategy : 'successRate',
         'paybridge.attempt': attempts.length + 1,
       });
       this.events.emitEvent({
@@ -224,7 +229,7 @@ export class PayBridgeRouter {
         const routingMeta: RoutingMeta = {
           attempts,
           chosenProvider: providerName,
-          strategy: this.strategy,
+          strategy: typeof this.strategy === 'string' ? this.strategy : 'successRate',
         };
 
         span.end();
@@ -354,12 +359,17 @@ export class PayBridgeRouter {
       );
     }
 
-    const strategyFn = getStrategy(this.strategy);
-    const ordered = strategyFn(filtered, context, () => {
-      const idx = this.rrIndex;
-      this.rrIndex = (this.rrIndex + 1) % filtered.length;
-      return idx;
-    });
+    let ordered: ProviderWithMeta[];
+    if (typeof this.strategy === 'string') {
+      const strategyFn = getStrategy(this.strategy);
+      ordered = strategyFn(filtered, context, () => {
+        const idx = this.rrIndex;
+        this.rrIndex = (this.rrIndex + 1) % filtered.length;
+        return idx;
+      });
+    } else {
+      ordered = await this.strategy.order(filtered);
+    }
 
     const attempts: RoutingAttempt[] = [];
     let lastError: Error | null = null;

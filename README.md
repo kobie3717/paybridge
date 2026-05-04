@@ -141,6 +141,65 @@ Reconciled: 5
 
 Exit code 1 if any mismatch, 0 if clean. Add `--webhook-url` to POST mismatch reports to Slack/Discord/your ops channel. Use `--json` for pipeline integration.
 
+## Postgres Ledger
+
+The ledger stores every payment attempt and outcome. In-memory and Redis adapters are ephemeral. For durable transaction history, use the Postgres adapter.
+
+### Schema Setup
+
+Create the table once via your migration tool:
+
+```typescript
+import { getPostgresLedgerTableSql } from 'paybridge';
+
+const sql = getPostgresLedgerTableSql();
+await pool.query(sql);
+```
+
+Or run the SQL manually:
+
+```sql
+CREATE TABLE paybridge_ledger (
+  id TEXT PRIMARY KEY,
+  timestamp TIMESTAMPTZ NOT NULL,
+  operation TEXT NOT NULL,
+  provider TEXT NOT NULL,
+  reference TEXT,
+  provider_id TEXT,
+  status TEXT NOT NULL,
+  amount NUMERIC,
+  currency TEXT,
+  duration_ms INTEGER,
+  error_code TEXT,
+  error_message TEXT,
+  metadata JSONB
+);
+
+CREATE INDEX idx_paybridge_ledger_provider_timestamp
+  ON paybridge_ledger (provider, timestamp DESC);
+CREATE INDEX idx_paybridge_ledger_reference
+  ON paybridge_ledger (reference) WHERE reference IS NOT NULL;
+CREATE INDEX idx_paybridge_ledger_status
+  ON paybridge_ledger (status);
+```
+
+### Usage
+
+```typescript
+import { Pool } from 'pg';
+import { PayBridgeRouter, createPostgresLedgerStore } from 'paybridge';
+
+const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+const ledger = createPostgresLedgerStore({ pool });
+
+const router = new PayBridgeRouter({
+  providers: [...],
+  ledger,
+});
+```
+
+Compatible with `pg` (`Pool`) and `postgres` (porsager) adapter wrappers. No runtime dep on `pg` — bring your own client.
+
 ## Quick Start
 
 > **Upgrading from 0.1 or 0.2?** See [docs/migration.md](docs/migration.md).
@@ -611,6 +670,34 @@ const router = new PayBridgeRouter({
 ```
 
 The Redis adapter works with both `ioredis` and `redis` (node-redis v4+) clients. State is eventually consistent across instances — race conditions during state transitions may cause a few extra failures, but correctness is preserved.
+
+### Intelligent routing — successRate strategy
+
+Static fee tables lie. PayBridge routes by actual outcomes when you give it ledger access:
+
+```typescript
+import { PayBridgeRouter, createSuccessRateStrategy, createPostgresLedgerStore } from 'paybridge';
+import { Pool } from 'pg';
+
+const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+const ledger = createPostgresLedgerStore({ pool });
+
+const strategy = createSuccessRateStrategy({
+  ledger,
+  windowMs: 24 * 60 * 60 * 1000,
+  fallback: 'cheapest',
+});
+
+const router = new PayBridgeRouter({
+  providers: [...],
+  strategy,
+  ledger,
+});
+```
+
+Providers are ranked by their real success rate from your own traffic. Below the minimum sample size, the configured fallback (default `cheapest`) takes over.
+
+**Why this matters**: A provider with 1.4% fee but 92% success rate costs more per successful transaction than a 2.5% / 99.5% provider. `successRate` makes routing decisions based on real outcomes from your traffic, not static fee tables.
 
 ## Currency Handling
 

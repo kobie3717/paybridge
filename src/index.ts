@@ -49,6 +49,8 @@ export * from './tracer';
 export { createRedisCircuitBreakerStore, type RedisLike, type RedisStoreOptions } from './stores/redis';
 export { createRedisIdempotencyStore, type RedisIdempotencyStoreOptions } from './stores/redis-idempotency';
 export { createRedisLedgerStore, type RedisLedgerStoreOptions } from './stores/redis-ledger';
+export { createPostgresLedgerStore, type PostgresLedgerStoreOptions, getCreateTableSql as getPostgresLedgerTableSql } from './stores/postgres-ledger';
+export type { PgPoolLike, PgQueryResult } from './stores/postgres';
 export { runReconcile, type ReconcileDeps } from './cli/reconcile';
 export * from './cli/reconcile-types';
 

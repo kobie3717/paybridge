@@ -10,6 +10,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Planned
 - Yellow Card real spec verification (when partner docs available)
 
+## [0.12.0] - 2026-05-04
+
+### Added
+- **PostgreSQL ledger adapter** — `createPostgresLedgerStore({ pool, tableName?, schema? })` for durable transaction history backed by Postgres. Compatible with `pg` (`Pool`) and `postgres` adapter wrappers via the minimal `PgPoolLike` interface (no runtime dep on `pg`). Includes `getPostgresLedgerTableSql()` helper that returns the CREATE TABLE + indexes as a SQL string for migrations.
+- **`successRate` routing strategy** — `createSuccessRateStrategy({ ledger, windowMs?, cacheTtlMs?, minSampleSize?, fallback? })` ranks providers by actual transaction success rates from the ledger, not static fee tables. Cached snapshot (60s default), refreshed lazily. Providers below the minimum sample size fall through to a fallback strategy (default cheapest). Strategy can be passed directly to `PayBridgeRouter` config.
+
+### Why this matters
+Static fee tables lie. A 1.4% / 92% provider costs more per **successful** transaction than a 2.5% / 99.5% one. `successRate` makes routing decisions based on real outcomes from your own traffic.
+
 ## [0.11.0] - 2026-05-04
 
 ### Added

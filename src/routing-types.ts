@@ -30,7 +30,7 @@ export interface RoutingAttempt {
 export interface RoutingMeta {
   attempts: RoutingAttempt[];
   chosenProvider: string;
-  strategy: RoutingStrategy;
+  strategy: RoutingStrategy | 'successRate';
 }
 
 export type RoutingStrategy = 'cheapest' | 'fastest' | 'priority' | 'round-robin';

@@ -65,6 +65,7 @@ export default defineConfig({
           items: [
             { text: 'Overview', link: '/routing/overview' },
             { text: 'Strategies', link: '/routing/strategies' },
+            { text: 'Success Rate Strategy', link: '/routing/success-rate' },
             { text: 'Circuit Breaker', link: '/routing/circuit-breaker' },
             { text: 'Crypto Router', link: '/routing/crypto-router' },
           ]
@@ -85,6 +86,7 @@ export default defineConfig({
           items: [
             { text: 'Events', link: '/observability/events' },
             { text: 'Ledger', link: '/observability/ledger' },
+            { text: 'Postgres Ledger', link: '/observability/postgres-ledger' },
             { text: 'Tracing', link: '/observability/tracing' },
           ]
         },
