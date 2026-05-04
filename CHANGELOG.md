@@ -10,6 +10,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Planned
 - Yellow Card real spec verification (when partner docs available)
 
+## [0.10.0] - 2026-05-04
+
+### Added
+- **`paybridge drift-check` CLI command** — captures sandbox createPayment response shapes per provider, stores baselines locally, detects drift on subsequent runs. Catches the kind of bug where a provider quietly moves an endpoint or renames a field between releases. Exit code 1 on drift, 0 on clean. Optional `--webhook-url` for alerting integrations.
+- **`paybridge drift-watch` CLI command** — runs `drift-check` on a loop (default 6h interval), emits webhook on drift detection. Drop in a long-running container or SystemD timer.
+- **`drift-detector` module** — public exports `captureShape`, `compareShapes`, `diffBaseline`, types `ResponseShape | DriftReport | ProviderBaseline`. Use independently to track provider response shapes outside the CLI.
+- **`FileDriftStore`** — pluggable `DriftStore` interface, file-backed implementation. Storage path `.paybridge/drift-baseline/<provider>.json`.
+
+### Why this matters
+Most payment SDKs trust provider docs. Docs lie. The Square endpoint `/checkout/payment-links → /online-checkout/payment-links` would have shipped silently to a real merchant. `drift-check` turns ad-hoc validation into a 1-line cron job that alerts you the moment a provider's API changes shape.
+
 ## [0.9.0] - 2026-05-04
 
 ### Added

@@ -4,6 +4,8 @@ import { runTest } from './commands/test';
 import { runProviders } from './commands/providers';
 import { runWebhook } from './commands/webhook';
 import { runQuote } from './commands/quote';
+import { runDrift } from './commands/drift';
+import { runDriftWatch } from './commands/drift-watch';
 import { printHelp, printVersion } from './utils';
 
 async function main() {
@@ -21,6 +23,12 @@ async function main() {
       break;
     case 'quote':
       await runQuote(args);
+      break;
+    case 'drift-check':
+      await runDrift(args);
+      break;
+    case 'drift-watch':
+      await runDriftWatch(args);
       break;
     case '-h':
     case '--help':

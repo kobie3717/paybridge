@@ -38,6 +38,9 @@ coverage/
 # Misc
 *.tgz
 
+# Drift baselines
+.paybridge/
+
 # Docs site
 docs-site/node_modules/
 docs-site/docs/.vitepress/dist/

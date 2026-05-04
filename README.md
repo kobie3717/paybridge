@@ -61,6 +61,46 @@ Runnable integrations for common Node.js frameworks:
 
 Each example uses `PayBridgeRouter` with Stripe + PayStack and demonstrates webhook signature verification, idempotency, and provider-specific routing.
 
+## Drift Detection
+
+Payment providers change their APIs without notice. A field gets renamed, an endpoint moves, a type changes from `string` to `number`. Your integration silently breaks.
+
+PayBridge includes **drift detection** — capture the shape of every provider's sandbox response, store it as a baseline, and get alerted the moment something changes.
+
+### Quick Start
+
+```bash
+# Capture baselines (one-time setup)
+npx paybridge drift-check --capture
+
+# Check for drift
+npx paybridge drift-check
+
+# Watch continuously (6-hour interval)
+npx paybridge drift-watch --interval 6h --webhook-url https://hooks.slack.com/...
+```
+
+### Example Output
+
+```
+=== Drift Detection ===
+
+[✓] stripe — no drift
+[⚠] mollie — drift detected:
+    + new keys: data.expiresAt, _links.dashboard.href
+    - removed keys: data.metadata.legacy
+    ! type changed: data.amount.value (string → number)
+[⚠] square — drift detected:
+    + new keys: payment_link.created_at_iso
+[ ] paystack — Missing: PAYSTACK_API_KEY
+```
+
+Exit code 1 if drift detected, 0 if clean. Perfect for CI/CD pipelines or cron jobs.
+
+### Why It Matters
+
+The Square `/checkout/payment-links → /online-checkout/payment-links` endpoint change would have shipped silently to production. With `drift-check` running daily, you get a Slack alert the moment it happens.
+
 ## Quick Start
 
 > **Upgrading from 0.1 or 0.2?** See [docs/migration.md](docs/migration.md).

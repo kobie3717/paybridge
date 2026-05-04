@@ -69,8 +69,19 @@ COMMANDS
   webhook verify <p>      Verify webhook signature (raw body from stdin)
   webhook parse <p>       Parse webhook event (raw body from stdin)
   quote <p> [opts]        Get a crypto on/off-ramp quote
+  drift-check [opts]      Capture/compare provider response shapes (drift detection)
+  drift-watch [opts]      Run drift-check on a loop (long-running monitor)
   help, -h, --help        Print this help
   version, -v             Print version
+
+DRIFT DETECTION
+  drift-check [provider]           Check all/single provider for API drift
+  drift-check --capture            Capture baseline snapshots (init mode)
+  drift-check --json               Output JSON instead of human-readable
+  drift-check --baseline-dir <p>   Custom baseline location (default: .paybridge/drift-baseline)
+  drift-check --webhook-url <url>  POST drift report to URL on detection
+  drift-watch --interval <6h|1h>   Run every interval (default: 6h)
+  drift-watch --once               Alias for drift-check (don't loop)
 
 PROVIDER ENV VARS
   See SETUP.md or run 'paybridge test --all' for the full list.
@@ -81,6 +92,9 @@ EXAMPLES
   STRIPE_API_KEY=sk_test_... paybridge test stripe
   echo '{"id":"evt_x"}' | paybridge webhook parse paystack \\
     --header x-paystack-signature=abc
+  paybridge drift-check --capture
+  paybridge drift-check stripe
+  paybridge drift-watch --interval 1h --webhook-url https://hooks.slack.com/...
 
 Docs: https://github.com/kobie3717/paybridge
 `.trim();

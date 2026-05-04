@@ -89,6 +89,13 @@ export default defineConfig({
           ]
         },
         {
+          text: 'Operations',
+          collapsed: true,
+          items: [
+            { text: 'Drift Detection', link: '/drift-detection' },
+          ]
+        },
+        {
           text: 'Reference',
           collapsed: true,
           items: [
