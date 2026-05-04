@@ -10,6 +10,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Planned
 - Yellow Card real spec verification (when partner docs available)
 
+## [0.7.0] - 2026-05-04
+
+### Added
+- **`paybridge` CLI tool** — bundled with the npm package, runs as `npx paybridge` after install.
+  - `paybridge providers [--json]` — list all providers + capabilities (fees, currencies, region, latency)
+  - `paybridge test <provider>` / `paybridge test --all` — run sandbox createPayment validation per-provider, env-var driven, exit code reflects pass/fail
+  - `paybridge webhook verify <provider>` / `paybridge webhook parse <provider>` — read raw body from stdin + headers from CLI flags, verify signature or parse event
+  - `paybridge quote <provider>` — fetch a crypto on/off-ramp quote with provider-specific options
+  - `paybridge --version` / `--help`
+- **Single source of truth** for sandbox runners — `src/cli/runners.ts` exports the per-provider validation table; both the CLI and `tests/e2e/sandbox-validate.ts` import it.
+
 ## [0.6.0] - 2026-05-04
 
 ### Added

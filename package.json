@@ -1,14 +1,19 @@
 {
   "name": "paybridge",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "One API for fiat + crypto payments. Multi-provider routing, automatic failover, MoonPay on/off-ramp. SA-first, global-ready.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "bin": {
+    "paybridge": "dist/cli/index.js"
+  },
   "scripts": {
     "build": "tsc",
+    "build:cli": "npm run build && node scripts/post-build.js",
     "clean": "rm -rf dist",
-    "prepack": "npm run clean && npm run build",
-    "prepublishOnly": "npm run clean && npm run build",
+    "cli": "node dist/cli/index.js",
+    "prepack": "npm run clean && npm run build:cli",
+    "prepublishOnly": "npm run clean && npm run build:cli",
     "test": "tsc && tsc --project tsconfig.test.json && node --test 'dist-test/**/*.test.js'",
     "test:e2e:moonpay": "tsx tests/e2e/moonpay-sandbox.ts",
     "test:e2e:yellowcard": "tsx tests/e2e/yellowcard-sandbox.ts",
@@ -39,7 +44,9 @@
     "pesapal",
     "transak",
     "ramp",
-    "east-africa"
+    "east-africa",
+    "cli",
+    "command-line"
   ],
   "author": "Kobie Wentzel",
   "license": "MIT",
