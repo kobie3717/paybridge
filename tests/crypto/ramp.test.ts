@@ -117,7 +117,8 @@ describe('RampProvider', () => {
 
   it('should have TODO(verify) marker in verifyWebhook code', () => {
     const fs = require('fs');
-    const code = fs.readFileSync('/root/paybridge/src/crypto/ramp.ts', 'utf8');
+    const path = require('path');
+    const code = fs.readFileSync(path.resolve(__dirname, '../../../src/crypto/ramp.ts'), 'utf8');
     assert.ok(code.includes('TODO(verify)'), 'Should contain TODO(verify) for ECDSA migration');
   });
 
