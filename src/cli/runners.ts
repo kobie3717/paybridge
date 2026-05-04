@@ -10,7 +10,7 @@ export interface ProviderRunner {
 const timestamp = Date.now();
 const testCustomer = {
   name: 'Test User',
-  email: 'test@example.com',
+  email: 'paybridge-sandbox@gmail.com',
   phone: '0825551234',
 };
 const testUrls = {

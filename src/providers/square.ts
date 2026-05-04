@@ -93,7 +93,7 @@ export class SquareProvider extends PaymentProvider {
       },
     };
 
-    const response = await this.apiRequest<any>('POST', '/checkout/payment-links', requestBody);
+    const response = await this.apiRequest<any>('POST', '/online-checkout/payment-links', requestBody);
 
     const link = response.payment_link;
 
