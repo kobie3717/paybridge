@@ -10,6 +10,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Planned
 - Yellow Card real spec verification (when partner docs available)
 
+## [0.8.0] - 2026-05-04
+
+### Added
+- **Framework example apps** — runnable integrations under `examples/frameworks/`:
+  - **Express** — classic Node.js, demonstrates `express.raw()` for webhook signature verification
+  - **Fastify** — custom content-type parser pattern for webhook bodies
+  - **Next.js** — App Router API routes with `params.provider` dynamic webhook routing
+  - **Hono** — edge-runtime ready (Cloudflare Workers, Bun, Deno, Node)
+  Each example uses `PayBridgeRouter` with Stripe + PayStack, `InMemoryIdempotencyStore`, and proper `WebhookDuplicateError` handling. None of these directories are shipped in the npm tarball.
+
 ## [0.7.0] - 2026-05-04
 
 ### Added

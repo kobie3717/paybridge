@@ -48,6 +48,17 @@ The playground lets you:
 
 Perfect for demos, learning, and rapid prototyping. See [playground/README.md](playground/README.md) for details.
 
+## Framework Examples
+
+Runnable integrations for common Node.js frameworks:
+
+- [Express](examples/frameworks/express/) — classic, raw body parsing for webhooks
+- [Fastify](examples/frameworks/fastify/) — Fastify plugin pattern, custom content type parser
+- [Next.js](examples/frameworks/nextjs/) — App Router API routes, multi-provider router
+- [Hono](examples/frameworks/hono/) — edge-runtime ready (Cloudflare Workers, Bun, Deno, Node)
+
+Each example uses `PayBridgeRouter` with Stripe + PayStack and demonstrates webhook signature verification, idempotency, and provider-specific routing.
+
 ## Quick Start
 
 > **Upgrading from 0.1 or 0.2?** See [docs/migration.md](docs/migration.md).
