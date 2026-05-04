@@ -14,7 +14,7 @@
     "cli": "node dist/cli/index.js",
     "prepack": "npm run clean && npm run build:cli",
     "prepublishOnly": "npm run clean && npm run build:cli",
-    "test": "tsc && tsc --project tsconfig.test.json && node --test 'dist-test/**/*.test.js'",
+    "test": "tsc && tsc --project tsconfig.test.json && find dist-test -name '*.test.js' -exec node --test {} +",
     "test:e2e:moonpay": "tsx tests/e2e/moonpay-sandbox.ts",
     "test:e2e:yellowcard": "tsx tests/e2e/yellowcard-sandbox.ts",
     "test:e2e:sandbox": "tsx tests/e2e/sandbox-validate.ts"
