@@ -95,7 +95,7 @@ getCapabilities(): ProviderCapabilities {
 - Routing strategies: cheapest, fastest, priority, round-robin
 - E2E sandbox harnesses
 
-See [CHANGELOG](/changelog) for full list.
+See [CHANGELOG.md](https://github.com/kobie3717/paybridge/blob/master/CHANGELOG.md) for full list.
 
 ## Need Help?
 
