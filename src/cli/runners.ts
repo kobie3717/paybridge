@@ -304,11 +304,37 @@ export const runners: ProviderRunner[] = [
     name: 'pesapal',
     envRequired: ['PESAPAL_CONSUMER_KEY', 'PESAPAL_CONSUMER_SECRET'],
     run: async () => {
+      const consumerKey = process.env.PESAPAL_CONSUMER_KEY!;
+      const consumerSecret = process.env.PESAPAL_CONSUMER_SECRET!;
+      let notificationId = process.env.PESAPAL_NOTIFICATION_ID;
+      if (!notificationId) {
+        const tokenRes = await fetch('https://cybqa.pesapal.com/pesapalv3/api/Auth/RequestToken', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+          body: JSON.stringify({ consumer_key: consumerKey, consumer_secret: consumerSecret }),
+        });
+        const tokenJson = await tokenRes.json() as { token: string };
+        const ipnRes = await fetch('https://cybqa.pesapal.com/pesapalv3/api/URLSetup/RegisterIPN', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Accept: 'application/json',
+            Authorization: `Bearer ${tokenJson.token}`,
+          },
+          body: JSON.stringify({
+            url: 'https://example.com/pesapal-ipn',
+            ipn_notification_type: 'GET',
+          }),
+        });
+        const ipnJson = await ipnRes.json() as { ipn_id: string };
+        notificationId = ipnJson.ipn_id;
+      }
       const pay = new PayBridge({
         provider: 'pesapal',
         credentials: {
-          apiKey: process.env.PESAPAL_CONSUMER_KEY!,
-          secretKey: process.env.PESAPAL_CONSUMER_SECRET!,
+          apiKey: consumerKey,
+          secretKey: consumerSecret,
+          notificationId,
         },
         sandbox: true,
       });
